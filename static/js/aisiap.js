@@ -4,24 +4,36 @@
 (function () {
     'use strict';
 
-    /* Sidebar (mobile) */
+    /* Sidebar (mobile drawer) + backdrop overlay */
+    var mqDesktop = window.matchMedia ? window.matchMedia('(min-width: 901px)') : null;
+
     function toggleSidebar(open) {
         var sb = document.getElementById('sidebar');
         var bd = document.getElementById('sidebarBackdrop');
         if (!sb) return;
         if (open === undefined) { open = !sb.classList.contains('open'); }
         sb.classList.toggle('open', open);
-        if (bd) { bd.style.display = open ? 'block' : 'none'; }
+        if (bd) { bd.classList.toggle('show', open); }
         document.body.style.overflow = open ? 'hidden' : '';
     }
 
+    function closeSidebar() { toggleSidebar(false); }
+
     document.addEventListener('click', function (e) {
         if (e.target.closest && e.target.closest('#sidebarToggle')) { toggleSidebar(); }
-        if (e.target.id === 'sidebarBackdrop') { toggleSidebar(false); }
+        if (e.target.closest && e.target.closest('#sidebarBackdrop')) { closeSidebar(); }
     });
     document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { toggleSidebar(false); }
+        if (e.key === 'Escape') { closeSidebar(); }
     });
+    /* Leaving mobile widths: force-close drawer + overlay and restore scrolling */
+    if (mqDesktop) {
+        var _onMqChange = function () { if (mqDesktop.matches) { closeSidebar(); } };
+        if (mqDesktop.addEventListener) { mqDesktop.addEventListener('change', _onMqChange); }
+        else if (mqDesktop.addListener) { mqDesktop.addListener(_onMqChange); }
+    }
+    /* Back/forward cache restore: guarantee a clean, interactive screen */
+    window.addEventListener('pageshow', function () { closeSidebar(); });
 
     /* User dropdown + notifications */
     document.addEventListener('click', function (e) {

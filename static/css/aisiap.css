@@ -79,14 +79,26 @@ strong { color: var(--ink-strong); font-weight: 600; }
 @media (max-width: 1400px) { .main { padding: 24px 36px 50px; max-width: 1100px; } }
 @media (max-width: 1200px) { .main { padding: 24px 32px 50px; max-width: 1000px; } }
 @media (max-width: 1024px) { .main { padding: 24px 28px 50px; max-width: 900px; } }
+/* Mobile drawer backdrop — declared BEFORE the media query so the media
+   query can safely switch it on without needing !important. JS toggles the
+   .show class; opacity/visibility/pointer-events guarantee the overlay can
+   never get stuck blocking the screen. */
+.sidebar-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(2,6,23,.7); z-index: 90;
+    -webkit-tap-highlight-color: transparent;
+}
 @media (max-width: 900px) {
     .main { margin-left: 0; margin-top: 0; padding: 20px 24px 60px; max-width: 100%; min-height: 100vh; }
-    .sidebar { transform: translateX(-130%); top: 0; bottom: 0; left: 0; border-radius: 0; }
+    .sidebar { transform: translateX(-130%); top: 0; bottom: 0; left: 0; right: auto; border-radius: 0; }
     .sidebar.open { transform: translateX(0); box-shadow: 24px 0 60px rgba(0,0,0,.6); }
     .menu-toggle { display: inline-flex; }
-    .sidebar-backdrop { content:""; position: fixed; inset: 0; background: rgba(2,6,23,.7); z-index: 90; display: block !important; }
+    .sidebar-backdrop {
+        display: block; opacity: 0; visibility: hidden; pointer-events: none;
+        transition: opacity .25s ease, visibility .25s ease;
+    }
+    .sidebar-backdrop.show { opacity: 1; visibility: visible; pointer-events: auto; }
 }
-.sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(2,6,23,.7); z-index: 90; }
 
 /* ============ SIDEBAR (continued) ============ */
 .sidebar {
@@ -1050,4 +1062,60 @@ img, svg, video, canvas, iframe { max-width: 100%; }
     .table thead th, .table tbody td { padding: 10px 10px; font-size: 12px; }
     .info-note, .warn-note { font-size: 12.5px; padding: 11px 12px; }
     .form-row { grid-template-columns: 1fr; gap: 0; }
+}
+
+/* ============================================================
+   RESPONSIVE POLISH v2 — overlay safety, touch targets,
+   step indicators, modals, tablets & phones
+   ============================================================ */
+
+/* ---- Any fixed overlay must never trap the page ---- */
+.qa-loader, #successModal { padding: 16px; }
+#successModal > div { max-height: 90vh; overflow-y: auto; }
+
+/* ---- Step-by-step indicators: wrap neatly instead of overflowing ---- */
+.steps { flex-wrap: wrap; }
+@media (max-width: 600px) {
+    .steps { gap: 5px; margin-bottom: 14px; }
+    .step { padding: 5px 9px; font-size: 10px; gap: 5px; }
+    .step .step-num { width: 16px; height: 16px; font-size: 9px; }
+}
+
+/* ---- Touch-friendly targets (44px minimum) on phones/tablets ---- */
+@media (max-width: 900px) {
+    .form-group input:not([type="checkbox"]):not([type="radio"]),
+    .form-group select, .form-group textarea,
+    input[type="text"], input[type="email"], input[type="password"],
+    input[type="date"], input[type="time"], input[type="number"],
+    input[type="search"], select, textarea {
+        min-height: 44px;
+    }
+    .btn { min-height: 42px; }
+    .btn-sm { min-height: 36px; }
+    .nav a { padding: 12px 12px; }
+    .menu-toggle { min-width: 42px; min-height: 42px; }
+    .icon-btn { min-width: 42px; min-height: 42px; }
+    .user-chip { min-height: 44px; }
+}
+
+/* ---- Tablets (portrait / landscape): balanced 2-col dashboards ---- */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .grid { gap: 18px; }
+    .card { padding: 20px 18px; }
+}
+
+/* ---- Small phones: extra-tight vertical rhythm, no cut-off content ---- */
+@media (max-width: 380px) {
+    .main { padding: 12px 10px 50px; }
+    .card { padding: 14px 11px; }
+    .hero { padding: 22px 16px; }
+    .hero h1 { font-size: 20px; }
+    .kpi-num { font-size: 26px; }
+    .auth-card { padding: 22px 14px 18px; }
+}
+
+/* ---- Desktop / large laptop: keep the airy multi-column layout ---- */
+@media (min-width: 1600px) {
+    .main { max-width: 1360px; padding: 28px 48px 60px; }
+    .grid { gap: 26px; }
 }
