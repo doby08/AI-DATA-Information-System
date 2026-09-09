@@ -78,6 +78,7 @@
 <main class="main">
     <div class="topbar">
         <div class="topbar-left">
+            <button class="icon-btn back-btn" id="backBtn" aria-label="Go back to the previous page" title="Back">{{ icon('arrow') }}</button>
             <button class="menu-toggle" id="sidebarToggle" aria-label="Toggle navigation">{{ icon('menu') }}</button>
             <div>
                 <h1>{% block page_title %}Dashboard{% endblock %}</h1>
@@ -150,6 +151,12 @@
 
     {% block content %}{% endblock %}
 </main>
+
+<!-- Mobile floating controls: menu + back, always reachable even when scrolled -->
+<div class="mobile-fab no-print">
+    <button class="fab" id="fabBack" aria-label="Go back to the previous page" title="Back">{{ icon('arrow') }}</button>
+    <button class="fab fab-menu" id="fabMenu" aria-label="Open navigation menu" title="Menu">{{ icon('menu') }}</button>
+</div>
 
 <script src="/static/js/aisiap.js"></script>
 {% block scripts %}{% endblock %}

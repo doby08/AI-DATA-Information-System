@@ -1752,14 +1752,18 @@ def save_response():
 @app.route("/api/edit-response", methods=["POST"])
 @login_required
 def edit_response():
-    """Edit an existing response in an interview session."""
+    """Edit an existing response in an interview session.
+
+    Accepts `response_id` (preferred — exact row) or the legacy
+    `response_index` (position among the session's responses)."""
     username = session.get('username', 'User')
     data = request.json
     session_id = data.get("session_id")
+    response_id = data.get("response_id")
     response_index = data.get("response_index", 0)
     response_text = data.get("response_text")
     
-    logger.info(f"User '{username}' editing response {response_index} for session {session_id}")
+    logger.info(f"User '{username}' editing response for session {session_id}")
     
     if not response_text or not response_text.strip():
         return jsonify({"status": "error", "message": "Response text cannot be empty."}), 400
@@ -1772,21 +1776,29 @@ def edit_response():
         conn.close()
         return jsonify({"status": "error", "message": "Only the creator of this interview can edit responses."}), 403
     
-    # Get all responses for this session ordered by question_id
-    responses = conn.execute(
-        """
-        SELECT id, question_id FROM interview_responses
-        WHERE session_id = ?
-        ORDER BY question_id
-        """,
-        (session_id,)
-    ).fetchall()
-    
-    if response_index < 0 or response_index >= len(responses):
-        conn.close()
-        return jsonify({"status": "error", "message": "Invalid response index."}), 400
-    
-    response_id = responses[response_index][0]
+    if response_id is not None:
+        row = conn.execute(
+            "SELECT id FROM interview_responses WHERE id = ? AND session_id = ?",
+            (response_id, session_id)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": "Response not found."}), 404
+        response_id = row[0]
+    else:
+        # Legacy index-based lookup (kept for backward compatibility)
+        responses = conn.execute(
+            """
+            SELECT id FROM interview_responses
+            WHERE session_id = ?
+            ORDER BY question_id
+            """,
+            (session_id,)
+        ).fetchall()
+        if response_index < 0 or response_index >= len(responses):
+            conn.close()
+            return jsonify({"status": "error", "message": "Invalid response index."}), 400
+        response_id = responses[response_index][0]
     
     # Update the response
     conn.execute(
@@ -1820,13 +1832,17 @@ def edit_response():
 @app.route("/api/delete-response", methods=["POST"])
 @login_required
 def delete_response():
-    """Delete a response from an interview session."""
+    """Delete a response from an interview session.
+
+    Accepts `response_id` (preferred — exact row) or the legacy
+    `response_index` (position among the session's responses)."""
     username = session.get('username', 'User')
     data = request.json
     session_id = data.get("session_id")
+    response_id = data.get("response_id")
     response_index = data.get("response_index", 0)
     
-    logger.info(f"User '{username}' deleting response {response_index} for session {session_id}")
+    logger.info(f"User '{username}' deleting response for session {session_id}")
     
     conn = sqlite3.connect(DATABASE)
     
@@ -1836,21 +1852,29 @@ def delete_response():
         conn.close()
         return jsonify({"status": "error", "message": "Only the creator of this interview can delete responses."}), 403
     
-    # Get all responses for this session ordered by question_id
-    responses = conn.execute(
-        """
-        SELECT id FROM interview_responses
-        WHERE session_id = ?
-        ORDER BY question_id
-        """,
-        (session_id,)
-    ).fetchall()
-    
-    if response_index < 0 or response_index >= len(responses):
-        conn.close()
-        return jsonify({"status": "error", "message": "Invalid response index."}), 400
-    
-    response_id = responses[response_index][0]
+    if response_id is not None:
+        row = conn.execute(
+            "SELECT id FROM interview_responses WHERE id = ? AND session_id = ?",
+            (response_id, session_id)
+        ).fetchone()
+        if not row:
+            conn.close()
+            return jsonify({"status": "error", "message": "Response not found."}), 404
+        response_id = row[0]
+    else:
+        # Legacy index-based lookup (kept for backward compatibility)
+        responses = conn.execute(
+            """
+            SELECT id FROM interview_responses
+            WHERE session_id = ?
+            ORDER BY question_id
+            """,
+            (session_id,)
+        ).fetchall()
+        if response_index < 0 or response_index >= len(responses):
+            conn.close()
+            return jsonify({"status": "error", "message": "Invalid response index."}), 400
+        response_id = responses[response_index][0]
     
     # Delete the response
     conn.execute("DELETE FROM interview_responses WHERE id = ?", (response_id,))
@@ -1964,7 +1988,7 @@ def interview_report(session_id):
     ).fetchone()
     responses = conn.execute(
         """
-        SELECT iq.question_text, ir.response_text, ir.key_points, ir.respondent_name, ir.response_duration, ir.timestamp
+        SELECT ir.id, iq.question_text, ir.response_text, ir.key_points, ir.respondent_name, ir.response_duration, ir.timestamp
         FROM interview_responses ir
         JOIN interview_questions iq ON ir.question_id = iq.id
         WHERE ir.session_id = ?
@@ -1972,6 +1996,7 @@ def interview_report(session_id):
         """,
         (session_id,)
     ).fetchall()
+    can_manage = can_manage_session(get_session_creator(conn, session_id))
     conn.close()
     
     if not session_data:
@@ -1991,7 +2016,7 @@ def interview_report(session_id):
     _current_responses = None
     _respondent_name = None
     _total_duration = 0
-    for _rq, _rt, _kp, _rn, _rd, _ts in responses:
+    for _rid, _rq, _rt, _kp, _rn, _rd, _ts in responses:
         if _current_question is None or _current_question != _rq:
             _current_question = _rq
             _current_responses = []
@@ -2000,7 +2025,7 @@ def interview_report(session_id):
             _points = json.loads(_kp) if _kp else []
         except (ValueError, TypeError):
             _points = []
-        _current_responses.append({'response': _rt or '', 'key_points': _points or []})
+        _current_responses.append({'id': _rid, 'response': _rt or '', 'key_points': _points or []})
         if _rn:
             _respondent_name = _rn
         if _rd:
@@ -2035,7 +2060,7 @@ def interview_report(session_id):
                       'respondent_name': session_data[3] if session_data and session_data[3] else (_respondent_name or 'Unknown'),
                       'response_duration': _total_duration or 'N/A'}
     
-    return render_template("interview_report.html", **report_data)
+    return render_template("interview_report.html", **report_data, can_manage=can_manage)
 
 
 @app.route("/interview/delete/<int:session_id>")

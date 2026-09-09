@@ -22,7 +22,25 @@
     document.addEventListener('click', function (e) {
         if (e.target.closest && e.target.closest('#sidebarToggle')) { toggleSidebar(); }
         if (e.target.closest && e.target.closest('#sidebarBackdrop')) { closeSidebar(); }
+        /* Floating mobile menu icon (always visible on phones, even when scrolled) */
+        if (e.target.closest && e.target.closest('#fabMenu')) { toggleSidebar(); }
+        /* Back buttons (topbar + floating mobile icon) */
+        if (e.target.closest && (e.target.closest('#backBtn') || e.target.closest('#fabBack'))) { goBack(); }
     });
+
+    /* Go back one step; fall back to the Interview History when there is
+       nowhere to go back to (e.g. opened directly or new tab). */
+    function goBack() {
+        closeSidebar();
+        if (window.history && window.history.length > 1) {
+            window.history.back();
+        } else if (document.referrer) {
+            window.location.href = document.referrer;
+        } else {
+            window.location.href = '/interviews';
+        }
+    }
+    window.aisiapGoBack = goBack;
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') { closeSidebar(); }
     });

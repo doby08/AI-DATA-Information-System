@@ -8,11 +8,23 @@
 <div class="flex-between mb-4 no-print">
     <div class="muted text-sm"><strong>{{ sdata[1] }}</strong> &nbsp;&bull;&nbsp; {{ meta.interview_code or 'N/A' }} &nbsp;&bull;&nbsp; {{ sdata[2]|upper }}</div>
     <div class="actions">
-        <a href="/interviews" class="btn btn-outline btn-sm">Back to Interviews</a>
+        <a href="/interviews" class="btn btn-outline btn-sm">{{ icon('arrow') }} Back to Interviews</a>
         <a href="/interview/report/{{ sdata[0] }}/print" target="_blank" class="btn btn-ghost btn-sm">{{ icon('print') }} Print / PDF</a>
         <a href="/interview/report/{{ sdata[0] }}/download" class="btn btn-success btn-sm">{{ icon('download') }} Download (Word)</a>
     </div>
 </div>
+
+{% if can_manage %}
+<div class="card mb-4 no-print" style="padding: 14px 18px;">
+    <div class="flex" style="gap:10px; flex-wrap:wrap; align-items:center;">
+        <span class="muted text-sm" style="font-weight:600; margin-right:4px;">{{ icon('sliders') }} Manage this interview:</span>
+        <a href="/interview/setup/{{ sdata[0] }}" class="btn btn-outline btn-sm">{{ icon('edit') }} Edit Questions &amp; Settings</a>
+        <a href="/interview/conduct/{{ sdata[0] }}" class="btn btn-ghost btn-sm">{{ icon('play') }} Reopen Session (add answers)</a>
+        <a href="/interview/complete/{{ sdata[0] }}" class="btn btn-ghost btn-sm" data-confirm="Regenerate the AI report from the current answers?">{{ icon('refresh') }} Regenerate Report</a>
+        <a href="/interview/delete/{{ sdata[0] }}" class="btn btn-danger btn-sm" data-confirm="Move this interview to the Trash Bin?">{{ icon('trash') }} Delete</a>
+    </div>
+</div>
+{% endif %}
 
 <!-- Respondent Bar -->
 <div class="card mb-4" style="padding: 16px 20px;">
@@ -91,12 +103,14 @@
 <div class="answer-box">
 <div class="flex-between" style="margin-bottom:8px;">
 <span class="respondent-chip"><span class="r-dot"></span> Respondent {{ loop.index }}</span>
+{% if can_manage %}
 <div class="actions no-print">
-<button class="btn btn-outline btn-sm" onclick="editResponse({{ loop.index0 }}, '{{ group.question|escape }}', '{{ r.response|escape }}')">{{ icon('edit') }} Edit</button>
-<button class="btn btn-danger btn-sm" onclick="deleteResponse({{ loop.index0 }})">{{ icon('trash') }} Delete</button>
+<button class="btn btn-outline btn-sm" onclick="openRespModal({{ r.id }}, {{ (r.response or '')|tojson }})">{{ icon('edit') }} Edit</button>
+<button class="btn btn-danger btn-sm" onclick="deleteResponse({{ r.id }})">{{ icon('trash') }} Delete</button>
 </div>
+{% endif %}
 </div>
-<div class="a-text" id="response-text-{{ loop.index0 }}">{{ r.response or '(no response recorded)' }}</div>
+<div class="a-text" id="response-text-{{ r.id }}">{{ r.response or '(no response recorded)' }}</div>
 {% if r.key_points %}<div class="a-points">{% for kp in r.key_points[:3] %}<span class="badge badge-default">{{ kp }}</span>{% endfor %}</div>{% endif %}
 </div>
 {% endfor %}
@@ -108,6 +122,7 @@
 </div>
 
 <!-- Repeat Interview Button -->
+{% if can_manage %}
 <div class="card section-card no-print">
 <div class="flex-between">
 <div>
@@ -117,46 +132,99 @@
 <a href="/interview/conduct/{{ sdata[0] }}" class="btn btn-primary">{{ icon('mic') }} Start New Round</a>
 </div>
 </div>
+
+<!-- Edit Response Modal -->
+<div class="modal-backdrop" id="respModalBackdrop" style="display:none;">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-label="Edit response">
+        <div class="modal-title">{{ icon('edit') }} Edit Response</div>
+        <div class="form-group" style="margin-bottom:6px;">
+            <label for="respModalText">Response</label>
+            <textarea id="respModalText" rows="6"></textarea>
+        </div>
+        <div class="flex" style="justify-content:flex-end; gap:10px; margin-top:10px;">
+            <button type="button" class="btn btn-outline" onclick="closeRespModal()">{{ icon('x') }} Cancel</button>
+            <button type="button" class="btn btn-primary" id="respModalSaveBtn">{{ icon('save') }} Save Changes</button>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if can_manage %}
 <script>
-function editResponse(index, question, response) {
-    const newResponse = prompt('Edit your response:', response);
-    if (newResponse !== null && newResponse.trim() !== '') {
+    const SESSION_ID = {{ sdata[0] }};
+    let editingResponseId = null;
+
+    function openRespModal(responseId, responseText) {
+        editingResponseId = responseId;
+        document.getElementById('respModalText').value = responseText || '';
+        document.getElementById('respModalBackdrop').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        setTimeout(function () { document.getElementById('respModalText').focus(); }, 60);
+    }
+
+    function closeRespModal() {
+        editingResponseId = null;
+        document.getElementById('respModalBackdrop').style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    document.addEventListener('click', function (e) {
+        const bd = document.getElementById('respModalBackdrop');
+        if (bd && bd.style.display !== 'none' && e.target === bd) { closeRespModal(); }
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { closeRespModal(); }
+    });
+
+    document.getElementById('respModalSaveBtn').addEventListener('click', function () {
+        const newResponse = document.getElementById('respModalText').value.trim();
+        if (!newResponse) {
+            if (window.aisiapToast) { window.aisiapToast('Response cannot be empty.', 'err'); }
+            else { alert('Response cannot be empty.'); }
+            return;
+        }
+        const saveBtn = this;
+        saveBtn.disabled = true;
         fetch('/api/edit-response', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                session_id: {{ sdata[0] }},
-                response_index: index,
+                session_id: SESSION_ID,
+                response_id: editingResponseId,
                 response_text: newResponse
             })
         })
         .then(r => r.json())
         .then(data => {
+            saveBtn.disabled = false;
             if (data.status === 'success') {
-                document.getElementById('response-text-' + index).textContent = newResponse;
-                if (window.aisiapToast) window.aisiapToast('Response updated successfully!', 'success');
+                closeRespModal();
+                const cell = document.getElementById('response-text-' + editingResponseId);
+                if (cell) { cell.textContent = newResponse; }
+                if (window.aisiapToast) { window.aisiapToast('Response updated. AI key points re-analyzed.', 'ok'); }
             } else {
-                if (window.aisiapToast) window.aisiapToast('Error updating response.', 'err');
+                if (window.aisiapToast) { window.aisiapToast(data.message || 'Error updating response.', 'err'); }
+                else { alert(data.message || 'Error updating response.'); }
             }
         })
         .catch(err => {
             console.error('Error:', err);
-            if (window.aisiapToast) window.aisiapToast('Error updating response.', 'err');
+            saveBtn.disabled = false;
+            if (window.aisiapToast) { window.aisiapToast('Error updating response.', 'err'); }
+            else { alert('Error updating response.'); }
         });
-    }
-}
+    });
 
-function deleteResponse(index) {
-    if (confirm('Are you sure you want to delete this response? This action cannot be undone.')) {
+    function deleteResponse(responseId) {
+        if (!confirm('Delete this response? The AI report will be regenerated from the remaining answers next time you finish this interview.')) { return; }
         fetch('/api/delete-response', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                session_id: {{ sdata[0] }},
-                response_index: index
+                session_id: SESSION_ID,
+                response_id: responseId
             })
         })
         .then(r => r.json())
@@ -164,14 +232,16 @@ function deleteResponse(index) {
             if (data.status === 'success') {
                 location.reload();
             } else {
-                if (window.aisiapToast) window.aisiapToast('Error deleting response.', 'err');
+                if (window.aisiapToast) { window.aisiapToast(data.message || 'Error deleting response.', 'err'); }
+                else { alert(data.message || 'Error deleting response.'); }
             }
         })
         .catch(err => {
             console.error('Error:', err);
-            if (window.aisiapToast) window.aisiapToast('Error deleting response.', 'err');
+            if (window.aisiapToast) { window.aisiapToast('Error deleting response.', 'err'); }
+            else { alert('Error deleting response.'); }
         });
     }
-}
 </script>
+{% endif %}
 {% endblock %}

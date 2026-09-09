@@ -55,20 +55,25 @@
                     </td>
                     <td data-label="Actions">
                         <div class="actions">
-                            {% if row[8] == 'completed' %}
-                                <a href="/interview/report/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View Report</a>
-                                <a href="/interview/prepare/{{ row[0] }}" class="btn btn-outline btn-sm">{{ icon('info') }} Details</a>
-                            {% elif can_manage %}
-                                <a href="/interview/setup/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('edit') }} Edit</a>
-                                {% if row[8] == 'planning' %}
-                                <a href="/interview/conduct/{{ row[0] }}" class="btn btn-success btn-sm">{{ icon('play') }} Start</a>
+                            {% if can_manage %}
+                                {% if row[8] == 'completed' %}
+                                    <a href="/interview/report/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View Report</a>
+                                    <a href="/interview/setup/{{ row[0] }}" class="btn btn-outline btn-sm">{{ icon('edit') }} Edit</a>
                                 {% else %}
-                                <a href="/interview/conduct/{{ row[0] }}" class="btn btn-success btn-sm">{{ icon('play') }} Continue</a>
-                                <a href="/interview/complete/{{ row[0] }}" class="btn btn-warning btn-sm">{{ icon('check') }} Finish</a>
+                                    <a href="/interview/setup/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('edit') }} Edit</a>
+                                    {% if row[8] == 'planning' %}
+                                    <a href="/interview/conduct/{{ row[0] }}" class="btn btn-success btn-sm">{{ icon('play') }} Start</a>
+                                    {% else %}
+                                    <a href="/interview/conduct/{{ row[0] }}" class="btn btn-success btn-sm">{{ icon('play') }} Continue</a>
+                                    <a href="/interview/complete/{{ row[0] }}" class="btn btn-warning btn-sm">{{ icon('check') }} Finish</a>
+                                    {% endif %}
                                 {% endif %}
-                                <a href="/interview/delete/{{ row[0] }}" class="btn btn-danger btn-sm" data-confirm="Move this interview to the Trash Bin?">{{ icon('trash') }}</a>
+                                <a href="/interview/delete/{{ row[0] }}" class="btn btn-danger btn-sm" data-confirm="Move this interview to the Trash Bin?" title="Move to Trash Bin">{{ icon('trash') }}</a>
                             {% else %}
-                                <a href="/interview/prepare/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View</a>
+                                {% if row[8] == 'completed' %}
+                                    <a href="/interview/report/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View Report</a>
+                                {% endif %}
+                                <a href="/interview/prepare/{{ row[0] }}" class="btn btn-outline btn-sm">{{ icon('info') }} Details</a>
                                 <span class="muted text-sm">Locked</span>
                             {% endif %}
                         </div>

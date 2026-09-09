@@ -4,10 +4,11 @@
 {% block page_sub %}Deleted interviews and data records — restore them or delete them forever{% endblock %}
 
 {% block content %}
+{% from "_icons.html" import icon with context %}
 <div class="card mb-4">
-    <div class="card-title">🗂️ Deleted Interviews</div>
+    <div class="card-title">{{ icon('trash') }} Deleted Interviews</div>
     {% if deleted_sessions %}
-    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+    <div class="table-wrap adaptive-table" style="box-shadow:none; border:1px solid var(--line);">
         <table class="table">
             <thead>
                 <tr><th>Title</th><th>Role</th><th>Created</th><th>Deleted</th><th>Creator</th><th>Actions</th></tr>
@@ -15,20 +16,20 @@
             <tbody>
                 {% for row, can_manage in deleted_sessions %}
                 <tr>
-                    <td>{{ row[1] }}</td>
-                    <td>{{ row[2]|upper }}</td>
-                    <td>{{ row[6] or '—' }}</td>
-                    <td>{{ row[10] or '' }}</td>
-                    <td>{{ row[11] or '—' }}</td>
-                    <td>
+                    <td data-label="Title"><div class="row-main">{{ row[1] }}</div></td>
+                    <td data-label="Role">{{ row[2]|upper }}</td>
+                    <td data-label="Created" class="muted">{{ row[6] or '—' }}</td>
+                    <td data-label="Deleted" class="muted">{{ row[10] or '' }}</td>
+                    <td data-label="Creator">{{ row[-1] or '—' }}</td>
+                    <td data-label="Actions">
                         {% if can_manage %}
                         <div class="actions">
-                            <a href="/trash/restore/session/{{ row[0] }}" class="btn btn-ghost btn-sm">♻️ Restore</a>
+                            <a href="/trash/restore/session/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('undo') }} Restore</a>
                             <a href="/trash/purge/session/{{ row[0] }}" class="btn btn-danger btn-sm"
-                               onclick="return confirm('Permanently delete this interview and ALL of its responses, questions, and reports? This cannot be undone.')">🔥 Delete Forever</a>
+                               onclick="return confirm('Permanently delete this interview and ALL of its responses, questions, and reports? This cannot be undone.')">{{ icon('trash') }} Delete Forever</a>
                         </div>
                         {% else %}
-                        <span style="font-size:12px; color:#64748b;">🔒 Only the creator or staff can manage this</span>
+                        <span style="font-size:12px; color:#64748b;">{{ icon('lock') }} Only the creator or staff can manage this</span>
                         {% endif %}
                     </td>
                 </tr>
