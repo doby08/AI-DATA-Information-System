@@ -445,7 +445,10 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
 @media (max-width: 860px) {
-    .adaptive-table table.table, .adaptive-table thead { display: none; }
+    /* Show the table as stacked "cards" — the table itself must stay visible
+       (display:none on the whole table previously made rows vanish on phones). */
+    .adaptive-table table.table { display: block; }
+    .adaptive-table thead { display: none; }
     .adaptive-table .table tbody { display: block; }
     .adaptive-table .table tbody tr {
         display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;
@@ -1035,7 +1038,7 @@ img, svg, video, canvas, iframe { max-width: 100%; }
     .table-wrap {
         overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px;
     }
-    .table-wrap .table { min-width: 620px; }
+    .table-wrap:not(.adaptive-table) .table { min-width: 620px; }
     .table thead th, .table tbody td { padding: 11px 12px; font-size: 12.5px; }
     .actions { flex-wrap: wrap; gap: 6px; }
     .actions .btn { width: auto; }
@@ -1118,4 +1121,52 @@ img, svg, video, canvas, iframe { max-width: 100%; }
 @media (min-width: 1600px) {
     .main { max-width: 1360px; padding: 28px 48px 60px; }
     .grid { gap: 26px; }
+}
+
+/* ============================================================
+   RESPONSIVE POLISH v3 — page-level layout fixes for phones
+   (fixes sections overlapping / squashing on small screens)
+   ============================================================ */
+
+/* Interview Setup / Prepare / New pages force a 2-column layout with a
+   fixed 320-330px side panel via inline style — stack it on tablets and
+   phones so the two sections never overlap or squeeze each other. */
+@media (max-width: 900px) {
+    .grid[style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+        gap: 16px;
+    }
+}
+
+/* Search inputs with inline fixed widths (260px/280px) must never push
+   past the screen edge — go full-width on phones */
+@media (max-width: 720px) {
+    #accountSearch,
+    #searchInput {
+        width: 100% !important;
+        max-width: 100%;
+    }
+    .card-title input[type="text"] { width: 100%; max-width: 100%; }
+    .card-title > * { min-width: 0; }
+
+    /* Form action rows (Cancel / Generate, Save / etc.) wrap onto new
+       lines instead of overlapping, and stretch for easy tapping */
+    .flex { flex-wrap: wrap; }
+    .flex[style*="justify-content"] .btn { flex: 1 1 auto; }
+
+    /* Profile header (avatar + name block) wraps gracefully */
+    .card div[style*="display:flex"][style*="align-items:center"] { flex-wrap: wrap; }
+
+    /* Insight bars and other fixed-width inner elements clamp */
+    div[style*="max-width:180px"] { max-width: 100% !important; }
+}
+
+/* Buttons inside stacked table "cards" stay tappable and never overlap */
+@media (max-width: 860px) {
+    .adaptive-table .actions,
+    .adaptive-table .btn { width: 100%; }
+    .adaptive-table .btn { justify-content: center; }
+    /* Reset-password rows inside stacked cards may wrap instead of squeezing */
+    .adaptive-table form[style*="nowrap"] { flex-wrap: wrap !important; }
+    .adaptive-table form[style*="nowrap"] input { width: 100% !important; flex: none; }
 }
