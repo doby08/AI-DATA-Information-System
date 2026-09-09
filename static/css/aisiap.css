@@ -694,7 +694,8 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 @media (max-width: 720px) {
     .grid-3 { grid-template-columns: 1fr; }
     .grid-4 { grid-template-columns: 1fr; }
-    .search-box { display: none; }
+    /* Search stays available on phones: it drops to its own full-width row
+       (see .topbar-right rules in MOBILE FIT POLICY v4) instead of vanishing. */
     .user-chip-info { display: none; }
     .form-row { grid-template-columns: 1fr; }
     .topbar .sub { display: none; }
@@ -1233,4 +1234,100 @@ img, svg, video, canvas, iframe { max-width: 100%; }
 @media (max-width: 480px) {
     .modal-backdrop { padding: 12px; }
     .modal-card { padding: 16px 14px; }
+}
+
+/* ============================================================
+   MOBILE FIT POLICY v4 — nothing gets cut off on any device
+   Goal: the whole interface fits the screen; scrolling DOWN always
+   reveals everything, and wide data tables pan LEFT/RIGHT inside
+   their own .table-wrap scroll container instead of breaking the page.
+   ============================================================ */
+
+/* 1) Safety net — the page itself never scrolls sideways (no half-visible
+   content when swiping). Everything must shrink or wrap instead; only data
+   tables keep horizontal panning inside their scroll container. */
+html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* 2) Grid/flex children may shrink below their content's ideal width, so a
+   long title, email, or ID can never blow the layout wider than the screen. */
+.main, .main > *, .grid, .grid > *, .card, .card > *,
+.flex, .flex > *, .flex-between, .flex-between > *,
+.form-row, .form-row > *, .topbar, .topbar > *, .topbar-left, .topbar-right {
+    min-width: 0;
+}
+
+/* 3) Long words wrap anywhere instead of pushing content off-screen. */
+.card, .card-title, .card-head-sub, .info-note, .warn-note, .answer-box,
+.a-text, .a-points, .row-main, .row-sub, .kpi, .kpi-label, .kpi-num,
+.muted, .empty, .section-card h2, .question-text, .question-item,
+.table thead th, .table tbody td, .badge, .respondent-chip, .export-box,
+.steps, .step, .form-hint, .form-help, .hero, .hero h1 {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* 4) Topbar on phones: everything fits in rows that wrap — back + menu +
+   title on top, then notifications / theme / account, then the search bar
+   full-width. Nothing is pushed past the screen edge. */
+@media (max-width: 720px) {
+    .topbar { row-gap: 10px; }
+    .topbar h1 { font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+    .topbar-left { flex: 1 1 auto; }
+    .topbar-right { flex-wrap: wrap; row-gap: 8px; justify-content: flex-end; }
+
+    /* Search bar: own full-width row instead of hidden */
+    .topbar-right .search-box,
+    .search-box {
+        display: flex;
+        order: 10;
+        flex: 1 1 100%;
+        width: 100%;
+        max-width: 100%;
+    }
+    #globalSearch { width: 100% !important; min-width: 0; }
+
+    /* Buttons, headings and card headers always wrap to new lines */
+    .flex-between { flex-wrap: wrap; gap: 10px; }
+    .card-title { flex-wrap: wrap; row-gap: 8px; }
+    .card-title .sub, .card-title .badge { max-width: 100%; }
+
+    /* Badges/chips may span two lines rather than overflow */
+    .badge { white-space: normal; text-align: left; }
+    .respondent-chip { white-space: normal; }
+
+    /* Summary cards keep readable padding without shrinking the text box */
+    .kpi { padding: 14px 12px; }
+}
+
+/* 5) Wide tables: scroll INSIDE their card with a subtle edge hint, so
+   swiping left/right reveals the remaining columns (Actions, etc.). */
+.table-wrap {
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+}
+.table-wrap thead th, .table-wrap tbody td { overflow-wrap: anywhere; word-break: break-word; }
+@media (max-width: 860px) {
+    /* Actions columns inside scrolling tables get breathing room */
+    .table-wrap .actions { min-width: 150px; }
+}
+
+/* 6) Fixed-width elements used across pages clamp to the viewport */
+@media (max-width: 720px) {
+    .conduct-card { max-width: 100%; }
+    .export-box { width: 100%; }
+    img, svg, video, canvas, iframe { max-width: 100%; }
+    .card div[style*="width:"], .card span[style*="width:"] { max-width: 100%; }
+    .flex[style*="gap"] { flex-wrap: wrap; }
+}
+
+/* 7) Phones in landscape / very short screens: tighten vertical rhythm so
+   scrolling down still feels natural */
+@media (max-height: 480px) and (orientation: landscape) {
+    .fab { width: 40px; height: 40px; }
+    .mobile-fab { gap: 8px; bottom: 10px; right: 10px; }
 }
