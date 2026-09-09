@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Interview Summary Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #111; margin: 40px; }
+        h1 { font-size: 20px; text-align: center; margin-bottom: 4px; }
+        .sub { text-align: center; color: #555; font-size: 12px; margin-bottom: 20px; }
+        h2 { font-size: 15px; border-bottom: 1px solid #999; padding-bottom: 4px; margin: 24px 0 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        th, td { border: 1px solid #bbb; padding: 6px 8px; text-align: left; vertical-align: top; }
+        th { background: #f0f0f0; }
+        .meta { font-size: 12px; margin-bottom: 3px; }
+        ul { margin: 0 0 0 18px; padding: 0; }
+        li { font-size: 12.5px; margin-bottom: 4px; }
+        .summary { white-space: pre-wrap; font-size: 12px; background: #f8f8f8; padding: 10px; border: 1px solid #ddd; font-family: Arial, sans-serif; }
+        .footer { margin-top: 24px; border-top: 1px solid #999; padding-top: 8px; font-size: 10px; color: #666; text-align: center; }
+    </style>
+</head>
+<body>
+    <h1>AI-ASSISTED STAKEHOLDERS INTERVIEW &amp; ANALYSIS PORTAL</h1>
+    <div class="sub">Interview Summary Report &mdash; Generated: {{ generated_at }} by {{ user }}</div>
+
+    <h2>Interview Details</h2>
+<div class="meta"><strong>Interview ID:</strong> {{ sdata[11] or 'N/A' }}</div>
+<div class="meta"><strong>Department / Office:</strong> {{ sdata[12] or 'N/A' }}</div>
+    <div class="meta"><strong>Interview Title:</strong> {{ sdata[1] }}</div>
+    <div class="meta"><strong>Participant Role:</strong> {{ sdata[2]|upper }}</div>
+    <div class="meta"><strong>Verifier:</strong> {{ sdata[3] or 'N/A' }}</div>
+    <div class="meta"><strong>Date:</strong> {{ sdata[4] or 'N/A' }}</div>
+    <div class="meta"><strong>Time:</strong> {{ sdata[5] or 'N/A' }}</div>
+    {% if sdata[7] %}<div class="meta"><strong>Completed At:</strong> {{ sdata[7] }}</div>{% endif %}
+
+    <h2>AI Summary</h2>
+    <div class="summary">{{ report[2] if report else 'No summary generated.' }}</div>
+
+    <h2>Pain Points</h2>
+    {% if pain_points %}
+    <ul>{% for p in pain_points %}<li>{{ p }}</li>{% endfor %}</ul>
+    {% else %}<p class="meta">None identified.</p>{% endif %}
+
+    <h2>Desired Features</h2>
+    {% if desired_features %}
+    <ul>{% for f in desired_features %}<li>{{ f }}</li>{% endfor %}</ul>
+    {% else %}<p class="meta">None identified.</p>{% endif %}
+
+    <h2>Recurring Issues</h2>
+    {% if recurring_issues %}
+    <ul>{% for i in recurring_issues %}<li>{{ i }}</li>{% endfor %}</ul>
+    {% else %}<p class="meta">None identified.</p>{% endif %}
+
+    <h2>Suggested Solutions</h2>
+    {% if suggested_solutions %}
+    <table>
+        <thead>
+            <tr><th style="width:32%;">Finding</th><th style="width:15%;">Source</th><th>Suggested Solution</th></tr>
+        </thead>
+        <tbody>
+            {% for s in suggested_solutions %}
+            <tr>
+                <td>{{ s.issue }}</td>
+                <td>{{ s.source }}</td>
+                <td>{{ s.solution }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="meta">No suggested solutions generated.</p>{% endif %}
+
+    <h2>Automated Recommendations &amp; Actionable Insights</h2>
+    {% if recommendations %}
+    <table>
+        <thead>
+            <tr><th style="width:26%;">Recommendation</th><th style="width:12%;">Priority</th><th>Action to Take</th></tr>
+        </thead>
+        <tbody>
+            {% for r in recommendations %}
+            <tr>
+                <td>{{ r.title }}</td>
+                <td>{{ r.priority }}</td>
+                <td>{{ r.action }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="meta">No recommendations generated.</p>{% endif %}
+
+    <h2>Interview Responses</h2>
+    {% if responses %}
+    <table>
+        <thead><tr><th style="width:40%;">Question</th><th>Response</th></tr></thead>
+        <tbody>
+            {% for q, r in responses %}
+            <tr><td>{{ q }}</td><td>{{ r or '—' }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}<p class="meta">No responses recorded.</p>{% endif %}
+
+    <div class="footer">
+        AI-ASSISTED STAKEHOLDERS INTERVIEW &amp; ANALYSIS PORTAL &bull; Generated {{ generated_at }}
+    </div>
+</body>
+</html>

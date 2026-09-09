@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Records - Print View</title>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { padding: 30px; color: #111; }
+        .no-print {
+            position: sticky; top: 0; background: #1f2937; color: white;
+            padding: 15px 30px; margin: -30px -30px 20px; display: flex;
+            justify-content: space-between; align-items: center; z-index: 10;
+        }
+        .no-print h1 { font-size: 20px; }
+        .no-print .btn {
+            background: #2563eb; color: white; border: none; cursor: pointer;
+            padding: 10px 18px; border-radius: 7px; font-size: 14px; text-decoration: none;
+        }
+        .no-print .btn:hover { background: #1d4ed8; }
+        .report-header { text-align: center; margin-bottom: 25px; }
+        .report-header h2 { font-size: 24px; margin-bottom: 5px; }
+        .report-header p { color: #555; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        table th, table td { border: 1px solid #ccc; padding: 8px 10px; text-align: left; }
+        table th { background: #f0f0f0; font-weight: bold; }
+        .total { margin-top: 15px; font-size: 13px; color: #555; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <h1>🖨️ Records — Print / Save as PDF</h1>
+        <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+
+    <div class="report-header">
+        <h2>Data Records Report</h2>
+        <p>Generated: {{ generated_at }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr>
+                <td>{{ record[0] }}</td>
+                <td>{{ record[1] }}</td>
+                <td>{{ record[2] }}</td>
+                <td>{{ record[3] or '' }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="4" style="text-align:center; color:#888;">No records found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="total">Total Records: {{ records|length }}</div>
+
+    <script>
+        // Auto-open the print dialog when the page loads
+        window.onload = function () {
+            setTimeout(function () { window.print(); }, 300);
+        };
+    </script>
+</body>
+</html>

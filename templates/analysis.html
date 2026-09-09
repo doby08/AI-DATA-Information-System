@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon with context %}
+{% block title %}AI Analysis{% endblock %}
+{% block page_title %}AI Analysis{% endblock %}
+{% block page_sub %}Aggregated analysis of all interview data and AI reports{% endblock %}
+
+{% block content %}
+<div class="grid grid-3 mb-4">
+    <div class="kpi">
+        <div class="kpi-top"><div class="kpi-ico">{{ icon('file') }}</div></div>
+        <div class="kpi-num">{{ total_sessions }}</div>
+        <div class="kpi-label">Total Sessions</div>
+    </div>
+    <div class="kpi" style="--kpi-accent:var(--accent-2);">
+        <div class="kpi-top"><div class="kpi-ico">{{ icon('message') }}</div></div>
+        <div class="kpi-num">{{ total_responses }}</div>
+        <div class="kpi-label">Total Responses</div>
+    </div>
+    <div class="kpi" style="--kpi-accent:var(--accent-3);">
+        <div class="kpi-top"><div class="kpi-ico">{{ icon('brain') }}</div></div>
+        <div class="kpi-num">{{ total_reports }}</div>
+        <div class="kpi-label">AI Reports</div>
+    </div>
+</div>
+
+<div class="grid grid-3 mb-4">
+    <div class="card">
+        <div class="card-title">{{ icon('alert') }} Pain Points</div>
+        {% if pain_points %}
+            <ul style="list-style:none;">
+                {% for p in pain_points[:10] %}
+                <li style="padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px;">{{ icon('alert') }} {{ p }}</li>
+                {% endfor %}
+            </ul>
+            {% if pain_points|length > 10 %}<p class="muted mt-3" style="font-size:12.5px;">+{{ pain_points|length - 10 }} more...</p>{% endif %}
+        {% else %}
+        <div class="empty"><div class="empty-ico">{{ icon('alert') }}</div>No pain points identified yet.</div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <div class="card-title">{{ icon('sparkles') }} Desired Features</div>
+        {% if desired_features %}
+            <ul style="list-style:none;">
+                {% for f in desired_features[:10] %}
+                <li style="padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px;">{{ icon('sparkles') }} {{ f }}</li>
+                {% endfor %}
+            </ul>
+            {% if desired_features|length > 10 %}<p class="muted mt-3" style="font-size:12.5px;">+{{ desired_features|length - 10 }} more...</p>{% endif %}
+        {% else %}
+        <div class="empty"><div class="empty-ico">{{ icon('sparkles') }}</div>No desired features identified yet.</div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <div class="card-title">{{ icon('refresh') }} Recurring Issues</div>
+        {% if recurring_issues %}
+            <ul style="list-style:none;">
+                {% for i in recurring_issues[:10] %}
+                <li style="padding:8px 0; border-bottom:1px solid var(--line); font-size:13.5px;">{{ icon('refresh') }} {{ i }}</li>
+                {% endfor %}
+            </ul>
+            {% if recurring_issues|length > 10 %}<p class="muted mt-3" style="font-size:12.5px;">+{{ recurring_issues|length - 10 }} more...</p>{% endif %}
+        {% else %}
+        <div class="empty"><div class="empty-ico">{{ icon('refresh') }}</div>No recurring issues identified yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-title">{{ icon('sparkles') }} AI Suggested Solutions</div>
+    {% if suggested_solutions %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr><th style="width:30%;">Finding</th><th>Source</th><th>Suggested Solution</th></tr>
+            </thead>
+            <tbody>
+                {% for s in suggested_solutions[:12] %}
+                <tr>
+                    <td>{{ s.issue }}</td>
+                    <td><span class="badge badge-purple">{{ s.source }}</span></td>
+                    <td>{{ icon('sparkles') }} {{ s.solution }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if suggested_solutions|length > 12 %}<p class="muted mt-3" style="font-size:12.5px;">+{{ suggested_solutions|length - 12 }} more (see individual reports)...</p>{% endif %}
+    {% else %}
+    <div class="empty"><div class="empty-ico">{{ icon('sparkles') }}</div>No suggested solutions yet. Complete an interview to generate them.</div>
+    {% endif %}
+</div>
+
+<div class="card mb-4">
+    <div class="card-title">{{ icon('brain') }} Automated Recommendations &amp; Actionable Insights</div>
+    {% if recommendations %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width:24%;">Recommendation</th>
+                    <th style="width:10%;">Priority</th>
+                    <th>Action to Take</th>
+                    <th style="width:22%;">Based On</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in recommendations[:12] %}
+                <tr>
+                    <td><strong>{{ r.title }}</strong></td>
+                    <td>
+                        {% if r.priority == 'High' %}<span class="badge badge-red">{{ icon('alert') }} High</span>
+                        {% elif r.priority == 'Low' %}<span class="badge badge-blue">{{ icon('check') }} Low</span>
+                        {% else %}<span class="badge badge-planning">{{ icon('refresh') }} Medium</span>{% endif %}
+                    </td>
+                    <td>{{ icon('check') }} {{ r.action }}</td>
+                    <td class="muted" style="font-size:12px;">{{ r.based_on }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if recommendations|length > 12 %}<p class="muted mt-3" style="font-size:12.5px;">+{{ recommendations|length - 12 }} more (see individual reports)...</p>{% endif %}
+    {% else %}
+    <div class="empty"><div class="empty-ico">{{ icon('brain') }}</div>No recommendations yet. Complete an interview to generate actionable insights.</div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-title">{{ icon('trending') }} Sessions by Response Volume</div>
+    {% if session_data %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Interview</th>
+                    <th>Status</th>
+                    <th>Responses</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in session_data %}
+                <tr>
+                    <td>{{ s[0] }}</td>
+                    <td>
+                        {% if s[1] == 'planning' %}
+                            <span class="badge badge-planning">{{ icon('target') }} Planning</span>
+                        {% elif s[1] == 'in_progress' %}
+                            <span class="badge badge-in_progress">{{ icon('play') }} In Progress</span>
+                        {% else %}
+                            <span class="badge badge-completed">{{ icon('check') }} Completed</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-blue">{{ s[2] }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty"><div class="empty-ico">{{ icon('trending') }}</div>No session data yet.</div>
+    {% endif %}
+</div>
+{% endblock %}

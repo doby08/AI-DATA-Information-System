@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Conduct Interview — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Conduct Interview{% endblock %}
+{% block page_sub %}Record each respondent's answers to the official question set{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<div class="conduct-card">
+    <!-- Simple loader shown while a response is being saved -->
+    <div class="qa-loader" id="qaLoader" style="display:none;" role="status" aria-live="polite">
+        <div class="qa-loader-card">
+            <span class="spinner"></span>
+            <span class="qa-loader-text" id="qaLoaderText">Saving response…</span>
+        </div>
+    </div>
+    <div class="card mb-3">
+        <div class="flex-between">
+            <div class="flex" style="gap:14px; flex-wrap:wrap;">
+                <span class="respondent-chip"><span class="r-dot"></span> {{ sdata[2]|upper }}</span>
+                <span class="muted text-sm">Verifier: <strong>{{ sdata[3] or 'N/A' }}</strong></span>
+            </div>
+            <span class="badge badge-cyan" id="question-counter">Q1 / {{ questions|length }}</span>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%;"></div></div>
+        <div class="question-item" style="margin-bottom:0;">
+            <div class="q-head">
+                <span class="question-num" id="questionNumber">Q1</span>
+                <span class="muted text-sm" id="questionMeta">Question 1 of {{ questions|length }}</span>
+            </div>
+            <div class="question-text" id="questionText" style="font-size:17px;"></div>
+            <div class="form-group mt-3" style="margin-bottom:12px;">
+                <label for="responseText">Your Response</label>
+                <textarea id="responseText" class="resp-textarea" placeholder="Type the respondent's answer here..."></textarea>
+            </div>
+            <div class="answer-box" id="keyPoints" style="display:none;">
+                <span class="text-sm" style="color:var(--accent-2); font-weight:700;">AI Identified:</span>
+                <span class="a-text" id="keyPointsText"></span>
+            </div>
+            <div class="flex" style="gap:10px; margin-top:14px; flex-wrap:wrap;">
+                <button class="btn btn-primary" id="nextBtn" onclick="saveAndNext()">Next Question</button>
+                <button class="btn btn-outline" id="skipBtn" onclick="skipQuestion()" style="display:none;">Skip</button>
+                <button class="btn btn-success" id="finishBtn" onclick="finishInterview()" style="display:none;">Finish Interview</button>
+                <a href="/interview/setup/{{ sdata[0] }}" class="btn btn-ghost" style="margin-left:auto;">Back to Setup</a>
+            </div>
+        </div>
+    </div>
+    <div class="info-note">{{ icon('info') }}<span>All respondents in this session answer the <strong>same {{ questions|length }} questions</strong> (Q1&ndash;Q{{ questions|length }}), so their answers can be compared side-by-side in the AI analysis.</span></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const questions = {{ questions|tojson }};
+    const sessionId = {{ sdata[0] }};
+    const respondentName = "{{ sdata[3] or session.get('username', 'Unknown') }}";
+    let currentQuestionIndex = 0;
+    let startTime = Date.now();
+    let questionStartTime = Date.now();
+
+    function displayQuestion() {
+        if (currentQuestionIndex >= questions.length) { finishInterview(); return; }
+        const question = questions[currentQuestionIndex];
+        document.getElementById('questionText').textContent = question[2];
+        document.getElementById('questionNumber').textContent = 'Q' + (currentQuestionIndex + 1);
+        document.getElementById('questionMeta').textContent = 'Question ' + (currentQuestionIndex + 1) + ' of ' + questions.length;
+        document.getElementById('question-counter').textContent = 'Q' + (currentQuestionIndex + 1) + ' / ' + questions.length;
+        document.getElementById('progressFill').style.width = ((currentQuestionIndex + 1) / questions.length) * 100 + '%';
+        document.getElementById('responseText').value = '';
+        document.getElementById('keyPoints').style.display = 'none';
+        const isLast = currentQuestionIndex === questions.length - 1;
+        document.getElementById('nextBtn').style.display = isLast ? 'none' : 'inline-flex';
+        document.getElementById('skipBtn').style.display = isLast ? 'none' : 'inline-flex';
+        document.getElementById('finishBtn').style.display = isLast ? 'inline-flex' : 'none';
+    }
+
+    function showLoader(message) {
+        document.getElementById('qaLoaderText').textContent = message || 'Saving response…';
+        document.getElementById('qaLoader').style.display = 'flex';
+        setControlsDisabled(true);
+    }
+
+    function hideLoader() {
+        document.getElementById('qaLoader').style.display = 'none';
+        setControlsDisabled(false);
+    }
+
+    function setControlsDisabled(disabled) {
+        var ids = ['nextBtn', 'skipBtn', 'finishBtn'];
+        for (var i = 0; i < ids.length; i++) {
+            var el = document.getElementById(ids[i]);
+            if (el) { el.disabled = disabled; }
+        }
+    }
+
+    function saveAndNext() {
+        const response = document.getElementById('responseText').value.trim();
+        if (!response) {
+            if (window.aisiapToast) { window.aisiapToast('Please enter a response before proceeding.', 'err'); }
+            else { alert('Please enter a response before proceeding.'); }
+            return;
+        }
+        const question = questions[currentQuestionIndex];
+        const duration = Math.round((Date.now() - questionStartTime) / 1000 / 60 * 10) / 10;
+        showLoader('Saving response…');
+        fetch('/api/save-response', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, question_id: question[0], response_text: response, respondent_name: respondentName, response_duration: duration }) })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (data.key_points && data.key_points.length > 0) { document.getElementById('keyPointsText').textContent = data.key_points.slice(0, 2).join(', '); }
+            hideLoader();
+            currentQuestionIndex++; displayQuestion();
+        })
+        .catch(function (error) {
+            console.error('Error:', error);
+            hideLoader();
+            if (window.aisiapToast) { window.aisiapToast('Error saving response. Please try again.', 'err'); }
+            else { alert('Error saving response. Please try again.'); }
+        });
+    }
+
+    function skipQuestion() { currentQuestionIndex++; displayQuestion(); }
+
+    function finishInterview() {
+        const response = document.getElementById('responseText').value.trim();
+        if (response) {
+            const question = questions[currentQuestionIndex];
+            const duration = Math.round((Date.now() - questionStartTime) / 1000 / 60 * 10) / 10;
+            showLoader('Saving response…');
+            fetch('/api/save-response', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, question_id: question[0], response_text: response, respondent_name: respondentName, response_duration: duration }) })
+            .then(function () { window.location.href = '/interview/complete/' + sessionId; })
+            .catch(function (error) {
+                console.error('Error:', error);
+                hideLoader();
+                if (window.aisiapToast) { window.aisiapToast('Error saving response. Please try again.', 'err'); }
+                else { alert('Error saving response. Please try again.'); }
+            });
+        } else {
+            showLoader('Preparing report…');
+            window.location.href = '/interview/complete/' + sessionId;
+        }
+    }
+
+    displayQuestion();
+</script>
+{% endblock %}

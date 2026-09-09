@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}Insights & Patterns{% endblock %}
+{% block page_title %}Insights & Patterns{% endblock %}
+{% block page_sub %}Patterns discovered automatically from your interview responses{% endblock %}
+
+{% block head_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-3 mb-4">
+    <div class="card">
+        <h3>Audit / Analysis</h3>
+        <div class="stat"><div class="num">{{ total_responses }}</div><div class="ico-big">💬</div></div>
+    </div>
+    <div class="card">
+        <h3>Patterns Monitored</h3>
+        <div class="stat"><div class="num">{{ patterns|length }}</div><div class="ico-big">🔍</div></div>
+    </div>
+    <div class="card">
+        <h3>Sessions</h3>
+        <div class="stat"><div class="num">{{ sessions|length }}</div><div class="ico-big">🗂️</div></div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-title">📈 Pattern Frequency Trend</div>
+    {% if patterns %}
+    <div style="position: relative; height: 320px; width: 100%;">
+        <canvas id="patternChart"></canvas>
+    </div>
+    {% else %}
+    <div class="empty"><div class="big">📈</div>No patterns detected yet. Collect more responses.</div>
+    {% endif %}
+</div>
+
+{% if patterns %}
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-title">🔍 Pattern Breakdown</div>
+        <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Pattern</th>
+                        <th>Mentions</th>
+                        <th>Intensity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for label, count in patterns.items() %}
+                    <tr>
+                        <td>{{ label }}</td>
+                        <td><span class="badge badge-blue">{{ count }}</span></td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <div style="flex:1; height:8px; background:#eef2ff; border-radius:10px; max-width:180px;">
+                                    <div style="width: {{ [count * 16, 100]|min }}%; height:100%; background:var(--accent-grad); border-radius:10px;"></div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">🗂️ Sessions Summary</div>
+        {% if sessions %}
+        <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Responses</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td>{{ s[0] }}</td>
+                        <td>{{ s[1]|upper }}</td>
+                        <td>
+                            {% if s[2] == 'planning' %}
+                                <span class="badge badge-planning">📝</span>
+                            {% elif s[2] == 'in_progress' %}
+                                <span class="badge badge-in_progress">⏳</span>
+                            {% else %}
+                                <span class="badge badge-completed">✅</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge badge-blue">{{ s[3] }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty"><div class="big">🗂️</div>No sessions yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="card-title">🗂️ Sessions Summary</div>
+    {% if sessions %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Responses</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in sessions %}
+                <tr>
+                    <td>{{ s[0] }}</td>
+                    <td>{{ s[1]|upper }}</td>
+                    <td>
+                        {% if s[2] == 'planning' %}
+                            <span class="badge badge-planning">📝</span>
+                        {% elif s[2] == 'in_progress' %}
+                            <span class="badge badge-in_progress">⏳</span>
+                        {% else %}
+                            <span class="badge badge-completed">✅</span>
+                        {% endif %}
+                    </td>
+                    <td><span class="badge badge-blue">{{ s[3] }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty"><div class="big">🗂️</div>No sessions yet.</div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if patterns %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('patternChart').getContext('2d');
+    
+    // Create gradient for the line
+    const gradient = ctx.createLinearGradient(0, 0, 0, 320);
+    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+    gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+    
+    const labels = {{ patterns.keys()|list|tojson }};
+    const data = {{ patterns.values()|list|tojson }};
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Pattern Mentions',
+                data: data,
+                borderColor: '#3b82f6',
+                backgroundColor: gradient,
+                borderWidth: 3,
+                pointBackgroundColor: '#22d3ee',
+                pointBorderColor: '#ffffff',
+                pointBorderWidth: 2,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointHoverBackgroundColor: '#8b5cf6',
+                pointHoverBorderColor: '#ffffff',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    align: 'end',
+                    labels: {
+                        color: '#8ea0bd',
+                        font: {
+                            family: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
+                            size: 12,
+                            weight: '600'
+                        },
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(12, 20, 36, 0.95)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#e6edf7',
+                    borderColor: 'rgba(148, 163, 184, 0.26)',
+                    borderWidth: 1,
+                    cornerRadius: 10,
+                    padding: 12,
+                    titleFont: {
+                        family: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
+                        size: 13,
+                        weight: '700'
+                    },
+                    bodyFont: {
+                        family: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
+                        size: 12
+                    },
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y + ' mentions';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.08)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: '#8ea0bd',
+                        font: {
+                            family: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
+                            size: 11,
+                            weight: '600'
+                        },
+                        maxRotation: 45,
+                        minRotation: 0
+                    },
+                    border: {
+                        display: false
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.08)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: '#8ea0bd',
+                        font: {
+                            family: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
+                            size: 11,
+                            weight: '600'
+                        },
+                        stepSize: 1,
+                        padding: 10
+                    },
+                    border: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

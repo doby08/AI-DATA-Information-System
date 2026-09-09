@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% set search_target = 'stakeholdersTable' %}
+{% block title %}Stakeholders{% endblock %}
+{% block page_title %}Stakeholders{% endblock %}
+{% block page_sub %}Stakeholder roles and verifiers captured across interviews{% endblock %}
+
+{% block content %}
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-title">🧑‍🤝‍🧑 Stakeholder Roles</div>
+        {% if roles %}
+        <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+            <table class="table" id="stakeholdersTable">
+                        <th>Interviews</th>
+                        <th>Completed</th>
+                        <th>Verifiers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in roles %}
+                    <tr>
+                        <td><span class="badge badge-purple">{{ r[0]|upper }}</span></td>
+                        <td>{{ r[1] }}</td>
+                        <td>{{ r[3] or 0 }}</td>
+                        <td>{{ r[2] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div id="stakeholdersTableEmpty" class="empty" style="display:none; padding:24px;">No stakeholders match your search.</div>
+        </div>
+        {% else %}
+        <div class="empty"><div class="big">👥</div>No stakeholder data yet.</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-title">🕵️ Active Interviewers / Verifiers</div>
+        {% if stakeholders_list %}
+        <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Verifier</th>
+                        <th>Sessions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in stakeholders_list %}
+                    <tr>
+                        <td>{{ s[0] }}</td>
+                        <td><span class="badge badge-blue">{{ s[1] }}</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty"><div class="big">🕵️</div>No verifiers recorded yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

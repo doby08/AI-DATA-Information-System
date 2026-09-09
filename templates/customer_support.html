@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Customer Support — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Customer Support{% endblock %}
+{% block page_sub %}Report issues, suggest features, or provide feedback for the interview system{% endblock %}
+
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<!-- Success Modal -->
+<div id="successModal" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(2,6,23,.8); align-items:center; justify-content:center; backdrop-filter:blur(4px);">
+    <div style="background:var(--panel); border:1px solid rgba(34,197,94,.4); border-radius:20px; padding:36px 40px; max-width:420px; width:90%; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(34,197,94,.1);">
+        <div style="width:64px; height:64px; border-radius:50%; background:rgba(34,197,94,.15); display:flex; align-items:center; justify-content:center; margin:0 auto 20px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <h3 id="successModalTitle" style="font-size:20px; font-weight:700; color:var(--ink-strong); margin-bottom:10px;">Success!</h3>
+        <p id="successModalMsg" style="color:var(--muted); font-size:14px; line-height:1.6; margin-bottom:24px;">Your submission was received.</p>
+        <button onclick="closeSuccessModal()" style="background:linear-gradient(135deg,#22c55e,#16a34a); color:#fff; border:none; padding:12px 36px; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s ease; box-shadow:0 4px 15px rgba(34,197,94,.3);">OK</button>
+    </div>
+</div>
+
+{% if success_kind %}
+<script>
+(function(){
+    var t = document.getElementById('successModalTitle');
+    var m = document.getElementById('successModalMsg');
+    {% if success_kind == 'ticket' %}
+    t.textContent = 'Report Submitted Successfully!';
+    m.textContent = "Your issue has been reported successfully! We\'ll review it shortly.";
+    {% else %}
+    t.textContent = 'Suggestion Submitted Successfully!';
+    m.textContent = 'Thank you for your suggestion! We appreciate your feedback.';
+    {% endif %}
+    document.getElementById('successModal').style.display = 'flex';
+})();
+</script>
+{% endif %}
+
+<div class="grid grid-2 mb-4">
+    <!-- Submit Support Ticket -->
+    <div class="card">
+        <div class="card-title">{{ icon('headphones') }} Report an Issue</div>
+        <p class="muted text-sm" style="margin-bottom:16px;">Having trouble with interviews, reports, or the AI analysis? Let us know.</p>
+        <form method="POST">
+            <input type="hidden" name="form_type" value="support_ticket">
+            <div class="form-group">
+                <label for="category">Issue Category <span class="required">*</span></label>
+                <select id="category" name="category" required>
+                    <option value="">— Select issue type —</option>
+                    <option value="interview_setup">Interview Setup Problem</option>
+                    <option value="question_gen">AI Question Generation</option>
+                    <option value="conducting">Conducting Interview</option>
+                    <option value="ai_analysis">AI Analysis &amp; Reports</option>
+                    <option value="search">Search Not Working</option>
+                    <option value="account">Account &amp; Login Issue</option>
+                    <option value="ui">Display/Interface Problem</option>
+                    <option value="data">Data Loss or Missing Records</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="subject">Subject <span class="required">*</span></label>
+                <input type="text" id="subject" name="subject" placeholder="Brief summary of the issue" required>
+            </div>
+            <div class="form-group">
+                <label for="message">Describe the Issue <span class="required">*</span></label>
+                <textarea id="message" name="message" rows="5" placeholder="What happened? What were you doing when the issue occurred?" required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                    <option value="low">Low — Minor inconvenience</option>
+                    <option value="medium" selected>Medium — Affects my work</option>
+                    <option value="high">High — Cannot complete task</option>
+                    <option value="urgent">Urgent — System unusable</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">{{ icon('send') }} Submit Report</button>
+        </form>
+    </div>
+
+    <!-- Submit Suggestion -->
+    <div class="card">
+        <div class="card-title">{{ icon('lightbulb') }} Suggest an Improvement</div>
+        <p class="muted text-sm" style="margin-bottom:16px;">Help us improve A.I.S.I.A.P. with your ideas and feedback.</p>
+        <form method="POST">
+            <input type="hidden" name="form_type" value="suggestion">
+            <div class="form-group">
+                <label for="suggestion_type">Suggestion Type <span class="required">*</span></label>
+                <select id="suggestion_type" name="suggestion_type" required>
+                    <option value="">— What area? —</option>
+                    <option value="interview_flow">Interview Process</option>
+                    <option value="ai_questions">AI Question Quality</option>
+                    <option value="reports">Reports &amp; Analysis</option>
+                    <option value="ui_design">User Interface</option>
+                    <option value="search_filter">Search &amp; Filtering</option>
+                    <option value="export">Export &amp; Download</option>
+                    <option value="stakeholders">Stakeholder Management</option>
+                    <option value="new_feature">New Feature Request</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="suggestion_title">Title <span class="required">*</span></label>
+                <input type="text" id="suggestion_title" name="suggestion_title" placeholder="Brief title for your suggestion" required>
+            </div>
+            <div class="form-group">
+                <label for="suggestion">Your Suggestion <span class="required">*</span></label>
+                <textarea id="suggestion" name="suggestion" rows="5" placeholder="Describe your idea in detail..." required></textarea>
+            </div>
+            <div class="form-group">
+                <label for="benefit">Who benefits most?</label>
+                <select id="benefit" name="benefit">
+                    <option value="my_role" selected>My role / department</option>
+                    <option value="all_users">All system users</option>
+                    <option value="students">Students</option>
+                    <option value="faculty">Faculty &amp; staff</option>
+                    <option value="administration">Administration</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">{{ icon('send') }} Submit Suggestion</button>
+        </form>
+    </div>
+
+<!-- Quick Help -->
+<div class="card mb-4">
+    <div class="card-title">{{ icon('help') }} Quick Help &amp; Common Questions</div>
+    <div class="grid grid-3" style="gap:16px;">
+        <div class="answer-box" style="margin-bottom:0;">
+            <div class="text-sm" style="color:var(--accent-2); font-weight:700; margin-bottom:6px;">How do I create a new interview?</div>
+            <div class="muted text-sm">Go to <strong>Interview Setup</strong> → Fill in details → Click <strong>Generate AI Questions</strong> → Save the question set.</div>
+        </div>
+        <div class="answer-box" style="margin-bottom:0;">
+            <div class="text-sm" style="color:var(--accent-2); font-weight:700; margin-bottom:6px;">How do I view AI analysis?</div>
+            <div class="muted text-sm">Complete an interview → Go to <strong>AI Analysis</strong> → View pain points, desired features, and suggested solutions.</div>
+        </div>
+        <div class="answer-box" style="margin-bottom:0;">
+            <div class="text-sm" style="color:var(--accent-2); font-weight:700; margin-bottom:6px;">How do I search for interviews?</div>
+            <div class="muted text-sm">Use the <strong>search bar</strong> at the top → Type name, role, or ID → Press <strong>Enter</strong> to see results.</div>
+        </div>
+    </div>
+</div>
+
+<!-- Previous Tickets -->
+<div class="card mb-4">
+    <div class="card-title">{{ icon('inbox') }} Your Support Tickets</div>
+    {% if tickets %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Category</th>
+                    <th>Subject</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in tickets %}
+                <tr>
+                    <td>{{ t[0] }}</td>
+                    <td><span class="badge badge-purple">{{ t[3]|replace('_', ' ')|upper if t[3] else 'OTHER' }}</span></td>
+                    <td>{{ t[4] }}</td>
+                    <td>
+                        {% if t[8] == 'urgent' %}
+                            <span class="badge badge-red">Urgent</span>
+                        {% elif t[8] == 'high' %}
+                            <span class="badge badge-in_progress">High</span>
+                        {% elif t[8] == 'medium' %}
+                            <span class="badge badge-planning">Medium</span>
+                        {% else %}
+                            <span class="badge badge-default">Low</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if t[6] == 'open' %}
+                            <span class="badge badge-in_progress">Open</span>
+                        {% elif t[6] == 'resolved' %}
+                            <span class="badge badge-completed">Resolved</span>
+                        {% elif t[6] == 'in_progress' %}
+                            <span class="badge badge-planning">In Progress</span>
+                        {% else %}
+                            <span class="badge badge-default">{{ t[6]|upper }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="muted">{{ t[7] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty"><div>📭</div>No support tickets submitted yet.</div>
+    {% endif %}
+</div>
+
+<!-- Previous Suggestions -->
+<div class="card">
+    <div class="card-title">{{ icon('lightbulb') }} Your Suggestions</div>
+    {% if suggestions %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Type</th>
+                    <th>Title</th>
+                    <th>Benefit</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in suggestions %}
+                <tr>
+                    <td>{{ s[0] }}</td>
+                    <td><span class="badge badge-blue">{{ s[3]|replace('_', ' ')|upper if s[3] else 'OTHER' }}</span></td>
+                    <td>{{ s[4] }}</td>
+                    <td>{{ s[6]|replace('_', ' ')|title if s[6] else '—' }}</td>
+                    <td>
+                        {% if s[7] == 'pending' %}
+                            <span class="badge badge-planning">Pending</span>
+                        {% elif s[7] == 'implemented' %}
+                            <span class="badge badge-completed">Implemented</span>
+                        {% elif s[7] == 'under_review' %}
+                            <span class="badge badge-in_progress">Under Review</span>
+                        {% else %}
+                            <span class="badge badge-default">{{ s[7]|upper }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="muted">{{ s[8] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty"><div>💡</div>No suggestions submitted yet.</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function closeSuccessModal() {
+    document.getElementById('successModal').style.display = 'none';
+}
+// Close modal when clicking outside
+document.getElementById('successModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeSuccessModal();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Requirements{% endblock %}
+{% block page_title %}Requirements{% endblock %}
+{% block page_sub %}Functional requirements derived from stakeholder feedback{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">Derived Requirements
+        <span class="badge badge-blue">{{ total }} total</span>
+    </div>
+    {% if requirements_list %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Interview</th>
+                    <th>Role</th>
+                    <th>Type</th>
+                    <th>Requirement</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in requirements_list %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ req.interview }}</td>
+                    <td><span class="badge badge-purple">{{ req.role|upper }}</span></td>
+                    <td>
+                        {% if req.type == 'Feature' %}
+                            <span class="badge badge-green">✨ Feature</span>
+                        {% else %}
+                            <span class="badge badge-red">🔧 Improvement</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ req.text }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="big">📋</div>
+        No requirements derived yet.<br>
+        <span class="muted">Requirements are generated when interviews are completed and reports are created.</span>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

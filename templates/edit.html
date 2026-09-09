@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Edit Data — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Edit Data{% endblock %}
+{% block page_sub %}Update an existing data record{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+<div class="card" style="max-width:640px;">
+    <div class="card-title"><span>{{ icon('edit') }} Edit Record</span></div>
+    <form method="POST">
+        <div class="form-group">
+            <label>Name</label>
+            <input type="text" name="name" value="{{ record[1] }}" required>
+        </div>
+        <div class="form-group">
+            <label>Category</label>
+            <input type="text" name="category" value="{{ record[2] }}" required>
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea name="description">{{ record[3] }}</textarea>
+        </div>
+        <div class="flex" style="gap:10px; margin-top:16px;">
+            <button type="submit" class="btn btn-primary">{{ icon('save') }} Update Data</button>
+            <a href="/" class="btn btn-outline">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

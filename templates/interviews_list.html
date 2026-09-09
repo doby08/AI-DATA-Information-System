@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% set search_target = 'interviewsTable' %}
+{% block title %}Interview History — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Interview History{% endblock %}
+{% block page_sub %}All interview sessions with their current status{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+{% if search_query %}
+<div class="info-note mb-4">
+    {{ icon('search') }}
+    <span>Search results for <strong>"{{ search_query }}"</strong> &mdash; {{ session_items|length }} result{{ 's' if session_items|length != 1 else '' }} found. <a href="/interviews" class="btn btn-ghost btn-sm" style="margin-left:8px;">Clear</a></span>
+</div>
+{% endif %}
+
+<div class="flex-between mb-4">
+    <div class="flex" style="gap:8px; flex-wrap:wrap;">
+        <a href="/interviews" class="btn btn-ghost btn-sm {{ 'btn-primary' if selected_category == 'All' }}" style="{{ '' }}">All</a>
+        {% for cat, count in categories.items() %}
+        <a href="/interviews?category={{ cat|urlencode }}" class="btn btn-ghost btn-sm {% if selected_category == cat %}btn-primary{% endif %}" style="--qa-accent:#3b82f6;">
+            {{ cat }} <span class="badge badge-default">{{ count }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    <a href="/interview/new" class="btn btn-primary btn-sm">{{ icon('plus') }} Set Up New Interview</a>
+</div>
+
+<div class="card">
+    <div class="card-title">
+        <span>{{ icon('clock') }} Interview Sessions</span>
+        <span class="sub">{{ session_items|length }} total</span>
+    </div>
+    {% if session_items %}
+    <div class="table-wrap adaptive-table">
+        <table class="table" id="interviewsTable">
+            <thead>
+                <tr>
+                    <th>Title</th><th>Role</th><th>Verifier</th><th>Date</th><th>Status</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row, can_manage in session_items %}
+                <tr>
+                    <td data-label="Title">
+                        <div class="row-main">{{ row[1] }}</div>
+                        {% if row[11] %}<div class="row-sub">{{ row[11] }}</div>{% endif %}
+                    </td>
+                    <td data-label="Role"><span class="badge badge-purple">{{ row[2]|upper }}</span></td>
+                    <td data-label="Verifier">{{ row[3] or '—' }}</td>
+                    <td data-label="Date" class="muted">{{ row[4] or '—' }}</td>
+                    <td data-label="Status">
+                        {% if row[8] == 'planning' %}<span class="badge badge-planning">{{ icon('target') }} Planning</span>
+                        {% elif row[8] == 'in_progress' %}<span class="badge badge-in_progress">{{ icon('play') }} In Progress</span>
+                        {% else %}<span class="badge badge-completed">{{ icon('check') }} Completed</span>{% endif %}
+                    </td>
+                    <td data-label="Actions">
+                        <div class="actions">
+                            {% if row[8] == 'completed' %}
+                                <a href="/interview/report/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View Report</a>
+                                <a href="/interview/prepare/{{ row[0] }}" class="btn btn-outline btn-sm">{{ icon('info') }} Details</a>
+                            {% elif can_manage %}
+                                <a href="/interview/setup/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('edit') }} Edit</a>
+                                {% if row[8] == 'planning' %}
+                                <a href="/interview/conduct/{{ row[0] }}" class="btn btn-success btn-sm">{{ icon('play') }} Start</a>
+                                {% else %}
+                                <a href="/interview/conduct/{{ row[0] }}" class="btn btn-success btn-sm">{{ icon('play') }} Continue</a>
+                                <a href="/interview/complete/{{ row[0] }}" class="btn btn-warning btn-sm">{{ icon('check') }} Finish</a>
+                                {% endif %}
+                                <a href="/interview/delete/{{ row[0] }}" class="btn btn-danger btn-sm" data-confirm="Move this interview to the Trash Bin?">{{ icon('trash') }}</a>
+                            {% else %}
+                                <a href="/interview/prepare/{{ row[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View</a>
+                                <span class="muted text-sm">Locked</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div id="interviewsTableEmpty" class="empty" style="display:none; padding:24px;">No interviews match your search.</div>
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="empty-ico">{{ icon('mic') }}</div>
+        No interview sessions{% if selected_category != 'All' %} found in "{{ selected_category }}"{% endif %}.<br>
+        <a href="/interview/new" class="btn btn-primary btn-sm mt-3">{{ icon('plus') }} Set Up Your First Interview</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

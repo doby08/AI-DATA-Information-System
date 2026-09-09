@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}AI Question Setup — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}AI Question Setup{% endblock %}
+{% block page_sub %}Review, edit, regenerate and save the official question set for this session{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<div class="steps">
+    <div class="step done"><span class="step-num">1</span> Configure Interview</div>
+    <span class="step" style="background:none;border:none;">&#8250;</span>
+    <div class="step active"><span class="step-num">2</span> AI Question Set</div>
+    <span class="step" style="background:none;border:none;">&#8250;</span>
+    <div class="step"><span class="step-num">3</span> Interview Session</div>
+    <span class="step" style="background:none;border:none;">&#8250;</span>
+    <div class="step"><span class="step-num">4</span> AI Analysis</div>
+</div>
+
+<div class="grid" style="grid-template-columns: minmax(0,1fr) 330px; align-items:start;">
+    <div>
+        <div class="card mb-3">
+            <div class="card-title">
+                <span>{{ icon('target') }} {{ sdata[1] }}</span>
+                {% if sdata[11] %}<span class="badge badge-default">{{ icon('copy') }} {{ sdata[11] }}</span>{% endif %}
+            </div>
+            <div class="card-head-sub">Interview session for <strong>{{ sdata[2]|upper }}</strong> stakeholders
+                {% if sdata[3] %} &mdash; respondent: <strong>{{ sdata[3] }}</strong>{% endif %}{% if sdata[4] %} on {{ sdata[4] }} {{ sdata[5] }}{% endif %}
+            </div>
+            <div class="grid grid-4" style="gap:12px;">
+                <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Respondents</div><div class="kpi-num" style="font-size:26px;">{{ meta.num_respondents }}</div></div>
+                <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Questions</div><div class="kpi-num" style="font-size:26px;">{{ questions|length }}</div></div>
+                <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Configured set</div><div class="kpi-num" style="font-size:26px;">{{ meta.num_questions }}</div></div>
+                <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Status</div><div style="margin-top:8px;">{% if meta.status == 'planning' %}<span class="badge badge-planning">Planning</span>{% elif meta.status == 'in_progress' %}<span class="badge badge-in_progress">In Progress</span>{% else %}<span class="badge badge-completed">Completed</span>{% endif %}</div></div>
+            </div>
+            {% if meta.objectives %}<div class="info-note" style="margin-top:14px; margin-bottom:0;">{{ icon('target') }}<span><strong>Objectives:</strong> {{ meta.objectives }}</span></div>{% endif %}
+        </div>
+<!--SETUP_Q-->
+        <div class="card">
+            <div class="card-title">
+                <span>{{ icon('brain') }} AI-Generated Questions</span>
+                <span class="badge badge-cyan">{{ questions|length }} questions</span>
+            </div>
+            <div class="card-head-sub">This is the official question set. Every respondent in this session will answer
+                exactly these questions &mdash; the set is saved once and never regenerated per respondent.</div>
+
+            {% if can_manage %}
+            <form method="POST" action="/interview/update-questions/{{ sdata[0] }}" id="questionsForm">
+                {% if questions %}
+                {% for q in questions %}
+                <div class="question-item">
+                    <div class="q-head"><span class="question-num">Q{{ loop.index }}</span><span class="question-category">{{ q[5] or 'context' }}</span>
+                        <label class="q-remove" title="Remove this question from the set">
+                            <input type="checkbox" name="remove_question_ids" value="{{ q[0] }}">
+                            <span class="text-sm">Remove</span>
+                        </label>
+                    </div>
+                    <div class="q-edit">
+                        <input type="hidden" name="question_ids" value="{{ q[0] }}">
+                        <textarea name="question_{{ q[0] }}" rows="2" aria-label="Question {{ loop.index }}">{{ q[2] }}</textarea>
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="flex" style="justify-content:flex-end; gap:10px; margin-top:16px;">
+                    <button type="submit" class="btn btn-primary">{{ icon('save') }} Save Question Set</button>
+                </div>
+                {% else %}
+                <div class="empty"><div class="empty-ico">{{ icon('brain') }}</div>No questions yet. Generate the AI question set to get started.</div>
+                {% endif %}
+            </form>
+            {% else %}
+                {% if questions %}
+                {% for q in questions %}
+                <div class="question-item">
+                    <div class="q-head"><span class="question-num">Q{{ loop.index }}</span><span class="question-category">{{ q[5] or 'context' }}</span></div>
+                    <div class="question-text">{{ q[2] }}</div>
+                </div>
+                {% endfor %}
+                <div class="info-note">{{ icon('lock') }} <span>Only the creator or staff can edit this question set.</span></div>
+                {% else %}
+                <div class="empty"><div class="empty-ico">{{ icon('brain') }}</div>No questions have been generated for this session yet.</div>
+                {% endif %}
+            {% endif %}
+
+            {% if can_manage %}
+            <form method="POST" action="/interview/regenerate-questions/{{ sdata[0] }}" id="regenForm" style="margin-top:10px;">
+                <button type="submit" class="btn btn-purple">{{ icon('refresh') }} Regenerate Questions (AI)</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div>
+        {% if can_manage %}
+        <div class="card mb-3">
+            <div class="card-title" style="font-size:13px;"><span>{{ icon('sliders') }} Session Settings</span></div>
+            <form method="POST" action="/interview/update-session/{{ sdata[0] }}">
+                <div class="form-group">
+                    <label for="num_respondents">Number of Respondents</label>
+                    <input type="number" id="num_respondents" name="num_respondents" min="1" max="999" value="{{ meta.num_respondents }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="num_questions">Number of Questions</label>
+                    <input type="number" id="num_questions" name="num_questions" min="1" max="15" value="{{ meta.num_questions }}" required>
+                    <div class="form-hint">Changing this regenerates the AI question set to the new count.</div>
+                </div>
+                <div class="form-group">
+                    <label for="interview_objectives">Interview Objectives</label>
+                    <textarea id="interview_objectives" name="interview_objectives" rows="3">{{ meta.objectives }}</textarea>
+                </div>
+                <div class="form-group">
+                    <label for="additional_instructions">Additional Instructions</label>
+                    <textarea id="additional_instructions" name="additional_instructions" rows="3">{{ meta.instructions }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-ghost btn-block">{{ icon('save') }} Save Settings</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="card">
+            <div class="card-title" style="font-size:13px;"><span>{{ icon('play') }} Next Steps</span></div>
+            <a href="/interview/conduct/{{ sdata[0] }}" class="btn btn-primary btn-block mb-3">{{ icon('play') }} Start Interview Session</a>
+            <a href="/interview/prepare/{{ sdata[0] }}" class="btn btn-outline btn-block mb-3">{{ icon('file') }} Interview Guide</a>
+            <a href="/interviews" class="btn btn-ghost btn-block">{{ icon('arrow') }} Back to Interviews</a>
+            <div class="warn-note" style="margin:14px 0 0;">{{ icon('lock') }}
+                <span>Once saved, the question set is fixed. Respondents cannot change the question count or the questions.</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var f = document.getElementById('regenForm');
+        if (f) { f.addEventListener('submit', function () { var b = f.querySelector('button'); b.disabled = true; b.innerHTML = 'Regenerating…'; }); }
+        var qf = document.getElementById('questionsForm');
+        if (qf) {
+            qf.addEventListener('submit', function (event) {
+                var removals = qf.querySelectorAll('input[name="remove_question_ids"]:checked');
+                var b = qf.querySelector('button[type="submit"]');
+                if (removals.length > 0) {
+                    var msg = 'Remove ' + removals.length + ' question(s) from this set?\n\nRespondents will answer the remaining questions only.';
+                    if (!window.confirm(msg)) { event.preventDefault(); return; }
+                }
+                b.disabled = true; b.innerHTML = 'Saving…';
+            });
+        }
+    })();
+</script>
+{% endblock %}

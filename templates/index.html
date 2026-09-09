@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_sub %}Overview of your interviews, responses, and AI analysis{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<!-- ============ HERO ============ -->
+<section class="hero fade-in">
+    <div class="hero-kicker">{{ icon('sparkles') }} AI-Powered Stakeholder Intelligence</div>
+    <h1>AI-ASSISTED <span class="grad">STAKEHOLDERS INTERVIEW</span> &amp; <span class="grad">ANALYSIS PORTAL</span></h1>
+    <p>Gather requirements, analyze responses, and generate actionable insights from stakeholder interviews — all in one intelligent portal.</p>
+    <div class="hero-actions">
+        <a href="/interview/new" class="btn btn-primary btn-lg">{{ icon('plus') }} Set Up New Interview</a>
+        <a href="/conduct" class="btn btn-outline btn-lg">{{ icon('mic') }} Interview Sessions</a>
+        <a href="/reports" class="btn btn-outline btn-lg">{{ icon('file') }} View Summary Reports</a>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 220">
+            <defs>
+                <linearGradient id="holo" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#22d3ee"/>
+                </linearGradient>
+                <linearGradient id="holo2" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#3b82f6"/>
+                </linearGradient>
+            </defs>
+            <g opacity=".9">
+                <circle cx="150" cy="110" r="88" fill="none" stroke="url(#holo)" stroke-width="1.4" opacity=".35" stroke-dasharray="6 8"/>
+                <circle cx="150" cy="110" r="62" fill="none" stroke="url(#holo)" stroke-width="1" opacity=".5"/>
+                <ellipse cx="150" cy="110" rx="108" ry="38" fill="none" stroke="url(#holo)" stroke-width="1" opacity=".3" transform="rotate(-18 150 110)"/>
+                <ellipse cx="150" cy="110" rx="108" ry="38" fill="none" stroke="url(#holo2)" stroke-width="1" opacity=".3" transform="rotate(22 150 110)"/>
+                <text x="150" y="106" text-anchor="middle" font-family="Inter,sans-serif" font-size="52" font-weight="800" fill="url(#holo)" opacity=".95">AI</text>
+                <text x="150" y="132" text-anchor="middle" font-family="Inter,sans-serif" font-size="11" letter-spacing="4" fill="#93c5fd" opacity=".8">INTELLIGENCE</text>
+                <circle cx="86" cy="72" r="4" fill="#22d3ee" opacity=".8"><animate attributeName="opacity" values=".3;1;.3" dur="2.4s" repeatCount="indefinite"/></circle>
+                <circle cx="214" cy="148" r="4" fill="#8b5cf6" opacity=".8"><animate attributeName="opacity" values=".3;1;.3" dur="2s" repeatCount="indefinite"/></circle>
+                <circle cx="96" cy="158" r="3" fill="#3b82f6" opacity=".8"><animate attributeName="opacity" values="1;.3;1" dur="1.8s" repeatCount="indefinite"/></circle>
+                <circle cx="204" cy="62" r="3" fill="#93c5fd" opacity=".7"/>
+            </g>
+        </svg>
+    </div>
+</section>
+<!-- ============ KPI CARDS ============ -->
+<div class="grid grid-3 mb-4">
+    <div class="kpi">
+        <div class="kpi-top">
+            <div class="kpi-ico">{{ icon('mic') }}</div>
+            <span class="kpi-trend up">{{ icon('trending') }} Live</span>
+        </div>
+        <div class="kpi-num">{{ total_sessions }}</div>
+        <div class="kpi-label">Total Interviews</div>
+        <div class="spark" id="sparkInterviews"></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-top">
+            <div class="kpi-ico">{{ icon('message') }}</div>
+            <span class="kpi-trend up">{{ icon('trending') }} Growing</span>
+        </div>
+        <div class="kpi-num">{{ processed_data }}</div>
+        <div class="kpi-label">Processed Responses</div>
+        <div class="spark" id="sparkResponses"></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-top">
+            <div class="kpi-ico">{{ icon('brain') }}</div>
+            <span class="kpi-trend up">{{ icon('trending') }} Ready</span>
+        </div>
+        <div class="kpi-num">{{ ai_results }}</div>
+        <div class="kpi-label">AI Reports Generated</div>
+        <div class="spark" id="sparkReports"></div>
+    </div>
+</div>
+<!-- ============ RECENT SESSIONS + QUICK ACTIONS ============ -->
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-title">
+            <span>{{ icon('clock') }} Recent Interview Sessions</span>
+            <a href="/interviews" class="btn btn-ghost btn-sm">{{ icon('arrow') }} View All</a>
+        </div>
+        <div class="card-head-sub">Latest stakeholder interviews and their status</div>
+        {% if sessions %}
+        <div class="table-wrap adaptive-table">
+            <table class="table">
+                <thead>
+                    <tr><th>Title</th><th>Role</th><th>Status</th><th>Action</th></tr>
+                </thead>
+                <tbody>
+                    {% for s in sessions %}
+                    <tr>
+                        <td data-label="Title">
+                            <div class="row-main">{{ s[1] }}</div>
+                            {% if s[11] %}<div class="row-sub">{{ s[11] }}</div>{% endif %}
+                        </td>
+                        <td data-label="Role"><span class="badge badge-purple">{{ s[2]|upper }}</span></td>
+                        <td data-label="Status">
+                            {% if s[8] == 'planning' %}<span class="badge badge-planning">{{ icon('target') }} Planning</span>
+                            {% elif s[8] == 'in_progress' %}<span class="badge badge-in_progress">{{ icon('play') }} In Progress</span>
+                            {% else %}<span class="badge badge-completed">{{ icon('check') }} Completed</span>{% endif %}
+                        </td>
+                        <td data-label="Action">
+                            {% if s[8] == 'completed' %}
+                                <a href="/interview/report/{{ s[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View</a>
+                            {% elif s[9] == user_id or s[9] == none or is_privileged %}
+                                {% if s[8] == 'in_progress' %}
+                                    <a href="/interview/conduct/{{ s[0] }}" class="btn btn-success btn-sm">{{ icon('play') }} Continue</a>
+                                {% else %}
+                                    <a href="/interview/setup/{{ s[0] }}" class="btn btn-outline btn-sm">{{ icon('edit') }} Edit</a>
+                                {% endif %}
+                            {% else %}
+                                <a href="/interview/prepare/{{ s[0] }}" class="btn btn-ghost btn-sm">{{ icon('file') }} View</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty">
+            <div class="empty-ico">{{ icon('mic') }}</div>
+            No interview sessions yet.<br>
+            <a href="/interview/new" class="btn btn-primary btn-sm mt-3">{{ icon('plus') }} Set Up Your First Interview</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-title"><span>{{ icon('sparkles') }} Quick Actions</span></div>
+        <div class="card-head-sub">Jump straight to your most common tasks</div>
+        <div class="qa-grid">
+            <a href="/interview/new" class="qa-item" style="--qa-accent:#3b82f6;">
+                <span class="qa-ico">{{ icon('pluscircle') }}</span>
+                <span class="qa-body"><span class="qa-title">Interview Setup</span><br><span class="qa-desc">Configure a new interview session</span></span>
+                <span class="qa-arrow">{{ icon('arrow') }}</span>
+            </a>
+            <a href="/conduct" class="qa-item" style="--qa-accent:#06b6d4;">
+                <span class="qa-ico">{{ icon('mic') }}</span>
+                <span class="qa-body"><span class="qa-title">Interview Sessions</span><br><span class="qa-desc">Start and manage interviews</span></span>
+                <span class="qa-arrow">{{ icon('arrow') }}</span>
+            </a>
+            <a href="/analysis" class="qa-item" style="--qa-accent:#8b5cf6;">
+                <span class="qa-ico">{{ icon('brain') }}</span>
+                <span class="qa-body"><span class="qa-title">AI Analysis</span><br><span class="qa-desc">Generate insights and find patterns</span></span>
+                <span class="qa-arrow">{{ icon('arrow') }}</span>
+            </a>
+            <a href="/requirements" class="qa-item" style="--qa-accent:#22c55e;">
+                <span class="qa-ico">{{ icon('clipboard') }}</span>
+                <span class="qa-body"><span class="qa-title">Requirements</span><br><span class="qa-desc">View and manage requirements</span></span>
+                <span class="qa-arrow">{{ icon('arrow') }}</span>
+            </a>
+            <a href="/reports" class="qa-item" style="--qa-accent:#f59e0b;">
+                <span class="qa-ico">{{ icon('file') }}</span>
+                <span class="qa-body"><span class="qa-title">Summary Reports</span><br><span class="qa-desc">View generated reports</span></span>
+                <span class="qa-arrow">{{ icon('arrow') }}</span>
+            </a>
+        </div>
+    </div>
+</div>
+<!-- ============ RECENT RESPONSES ============ -->
+<div class="card">
+    <div class="card-title">
+        <span>{{ icon('clipboard') }} Recent Responses</span>
+        <a href="/responses" class="btn btn-ghost btn-sm">{{ icon('arrow') }} View All</a>
+    </div>
+    {% if recent_responses %}
+    <div class="table-wrap">
+        <table class="table">
+            <thead><tr><th>Interview</th><th>Question</th><th>Response</th><th>Timestamp</th></tr></thead>
+            <tbody>
+                {% for r in recent_responses %}
+                <tr>
+                    <td><span class="row-main">{{ r[1] }}</span><div class="row-sub">{{ r[2]|upper }}</div></td>
+                    <td>{{ r[3][:60] }}{% if r[3]|length > 60 %}...{% endif %}</td>
+                    <td class="muted">{{ r[4][:80] }}{% if r[4]|length > 80 %}...{% endif %}</td>
+                    <td class="muted text-sm">{{ r[5] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty"><div class="empty-ico">{{ icon('message') }}</div>No responses recorded yet. Set up an interview to start collecting data.</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% from "_icons.html" import icon with context %}
+<script>
+    window.addEventListener('DOMContentLoaded', function () {
+        var si = document.getElementById('sparkInterviews');
+        var sr = document.getElementById('sparkResponses');
+        var sp = document.getElementById('sparkReports');
+        if (si) window.aisiapSpark(si, [2, 3, 2, 4, 5, 6, {{ total_sessions }}], '#3b82f6');
+        if (sr) window.aisiapSpark(sr, [{{ planning_sessions|default(0) }}, {{ in_progress_sessions|default(0) }}, {{ completed_sessions|default(0) }}, 5, 9, 14, {{ processed_data }}], '#22d3ee');
+        if (sp) window.aisiapSpark(sp, [0, 1, 1, 2, 3, 4, {{ ai_results }}], '#8b5cf6');
+    });
+</script>
+{% endblock %}

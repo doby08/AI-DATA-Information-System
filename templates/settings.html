@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+{% block title %}Settings — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block page_sub %}Manage your profile, interview defaults, AI analysis, and data{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<div class="grid grid-2-eq">
+    <!-- PROFILE -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('user') }} Profile Settings</span></div>
+        <form method="POST">
+            <input type="hidden" name="form_type" value="profile">
+            <div class="form-group">
+                <label>Username (login)</label>
+                <input type="text" value="{{ user[1] }}" disabled>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" name="email" value="{{ user[3] or '' }}" placeholder="you@example.com">
+            </div>
+            <button type="submit" class="btn btn-primary">{{ icon('save') }} Save Profile</button>
+        </form>
+    </div>
+
+    <!-- PROFILE PICTURE -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('user') }} Profile Picture</span></div>
+        <div class="flex mb-3">
+            {% if profile_pic %}
+            <img src="/static/{{ profile_pic }}" alt="Profile picture" class="avatar" style="width:64px;height:64px;font-size:24px;">
+            {% else %}
+            <div class="avatar" style="width:64px;height:64px;font-size:24px;">{{ (user[1] or 'U')[0]|upper }}</div>
+            {% endif %}
+            <span class="muted text-sm">Shown next to your name in the top bar. Change it anytime.</span>
+        </div>
+        <form method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="form_type" value="avatar">
+            <div class="form-group">
+                <label>Choose a new picture (PNG, JPG, GIF, WEBP — max 4 MB)</label>
+                <input type="file" name="avatar" accept=".png,.jpg,.jpeg,.gif,.webp" required>
+            </div>
+            <button type="submit" class="btn btn-primary">{{ icon('download') }} Upload Picture</button>
+        </form>
+        {% if profile_pic %}
+        <form method="POST" class="mt-3">
+            <input type="hidden" name="form_type" value="avatar_remove">
+            <button type="submit" class="btn btn-danger btn-sm" data-confirm="Remove your profile picture?">{{ icon('trash') }} Remove Picture</button>
+        </form>
+        {% endif %}
+    </div>
+
+    <!-- CHANGE PASSWORD -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('lock') }} Change Password</span></div>
+        <form method="POST">
+            <input type="hidden" name="form_type" value="password">
+            <div class="form-group">
+                <label>Current Password</label>
+                <input type="password" name="current_password" required>
+            </div>
+            <div class="form-group">
+                <label>New Password (at least 6 characters)</label>
+                <input type="password" name="new_password" required>
+            </div>
+            <div class="form-group">
+                <label>Confirm New Password</label>
+                <input type="password" name="confirm_password" required>
+            </div>
+            <button type="submit" class="btn btn-warning">{{ icon('lock') }} Change Password</button>
+        </form>
+    </div>
+
+    <!-- INTERVIEW DEFAULTS -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('target') }} Interview Defaults</span></div>
+        <form method="POST">
+            <input type="hidden" name="form_type" value="defaults">
+            <div class="form-group">
+                <label>Default Verifier / Interviewer Name</label>
+                <input type="text" name="verifier_name" value="{{ defaults.verifier_name }}" placeholder="e.g., Juan Dela Cruz">
+            </div>
+            <div class="form-group">
+                <label>Default Verifier Role</label>
+                <input type="text" name="verifier_role" value="{{ defaults.verifier_role }}" placeholder="e.g., Research Assistant">
+            </div>
+            <div class="form-group">
+                <label>Default Number of AI Questions</label>
+                <input type="number" name="question_count" min="1" max="20" value="{{ defaults.question_count }}">
+            </div>
+            <button type="submit" class="btn btn-primary">{{ icon('save') }} Save Defaults</button>
+            <p class="form-hint">Used when creating a new interview.</p>
+        </form>
+    </div>
+
+    <!-- AI KEYWORDS -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('brain') }} AI Analysis Keywords</span></div>
+        <form method="POST">
+            <input type="hidden" name="form_type" value="ai">
+            <div class="form-group">
+                <label>Pain Point Keywords (comma-separated)</label>
+                <textarea name="pain_keywords" rows="2">{{ ai.pain_keywords }}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Desired Feature Keywords</label>
+                <textarea name="feature_keywords" rows="2">{{ ai.feature_keywords }}</textarea>
+            </div>
+            <div class="form-group">
+                <label>Workflow Keywords</label>
+                <textarea name="workflow_keywords" rows="2">{{ ai.workflow_keywords }}</textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">{{ icon('save') }} Save AI Settings</button>
+        </form>
+    </div>
+    <!-- GEMINI AI API (ADMIN ONLY, SYSTEM-WIDE KEY) -->
+    {% if is_admin %}
+    <div class="card">
+        <div class="card-title"><span>{{ icon('sparkles') }} Gemini AI (Real AI API)</span></div>
+        <p class="form-hint" style="margin-bottom:12px;">
+            <strong>System-wide:</strong> only staff/admin accounts (e.g., the Dean) configure this —
+            every account will then receive AI-generated results, no per-account key needed.<br>
+            Get a <strong>FREE</strong> API key at
+            <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a>.<br>
+            When enabled, interview questions, summaries, and recommendations are generated by Google Gemini.
+            When off (or offline), the system automatically uses the built-in rules — nothing breaks.
+        </p>
+        <form method="POST" id="aiApiForm">
+            <input type="hidden" name="form_type" value="ai_api">
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" name="ai_enabled" style="width:auto; margin-right:8px; vertical-align:middle;" {% if ai_api.enabled %}checked{% endif %}>
+                    Enable Gemini AI
+                </label>
+            </div>
+            <div class="form-group">
+                <label>Gemini API Key</label>
+                <input type="password" name="api_key" autocomplete="off"
+                       placeholder="{% if ai_api.has_key %}Saved key: {{ ai_api.masked_key }} — leave blank to keep it{% else %}Paste your API key here{% endif %}">
+            </div>
+            <div class="form-group">
+                <label>Model</label>
+                <input type="text" name="ai_model" list="gemini-models" value="{{ ai_api.model }}">
+                <datalist id="gemini-models">
+                    <option value="gemini-3.6-flash">
+                    <option value="gemini-3.8-flash">
+                    <option value="gemini-3.7-flash">
+                    <option value="gemini-3.5-flash">
+                    <option value="gemini-2.5-flash">
+                </datalist>
+            </div>
+            <div class="flex" style="gap:10px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-success" onclick="testAI()">{{ icon('check') }} Test Connection</button>
+                <button type="submit" class="btn btn-primary">{{ icon('save') }} Save Gemini AI Settings</button>
+            </div>
+            <p id="aiTestResult" class="form-hint" style="margin-top:10px;"></p>
+        </form>
+    </div>
+    {% else %}
+    <!-- GEMINI STATUS (regular users) -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('sparkles') }} Gemini AI</span></div>
+        {% if ai_api.enabled %}
+        <div class="info-note" style="margin-bottom:0;">{{ icon('info') }}
+            <span><strong>AI is ON for the whole system.</strong> Interview questions, summaries, and
+            recommendations are generated by Google Gemini ({{ ai_api.model }}) using the API key
+            configured by the administrator — no personal key needed.</span>
+        </div>
+        {% else %}
+        <div class="info-note" style="margin-bottom:0;">{{ icon('info') }}
+            <span>AI is currently OFF, so the system uses the built-in keyword analysis.
+            The administrator (Dean/staff) can enable Google Gemini once in their Settings, and then
+            every account will automatically receive AI responses.</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    <!-- DATA MANAGEMENT -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('download') }} Data Management</span></div>
+        <div class="export-box">
+            <strong>Records Data</strong>
+            <div class="box-actions">
+                <a href="/export/records/csv" class="btn btn-outline btn-sm">Export CSV</a>
+                <a href="/export/records/word" class="btn btn-outline btn-sm">Export Word</a>
+                <a href="/export/records/print" class="btn btn-success btn-sm" target="_blank">Print / PDF</a>
+            </div>
+            <p class="hint">Export all data records. In Print view, choose "Save as PDF" from the printer dialog.</p>
+        </div>
+        <div class="export-box">
+            <strong>Interview Reports</strong>
+            <div class="box-actions">
+                <a href="/export/reports/csv" class="btn btn-outline btn-sm">Export CSV</a>
+            </div>
+            <p class="hint">Export completed interview reports and AI analysis.</p>
+        </div>
+        <div class="export-box">
+            <strong>Login History</strong>
+            <div class="box-actions">
+                <a href="/export/logins/csv" class="btn btn-outline btn-sm">Export CSV</a>
+            </div>
+            <p class="hint">Export your login / logout activity.</p>
+        </div>
+        <div class="export-box">
+            <strong>Database Backup</strong>
+            <div class="box-actions">
+                <a href="/export/backup" class="btn btn-danger btn-sm">Download Backup (.db)</a>
+            </div>
+            <p class="hint">Full copy of your database for safekeeping.</p>
+        </div>
+    </div>
+
+    <!-- LOGIN HISTORY -->
+    <div class="card">
+        <div class="card-title"><span>{{ icon('clock') }} Login History</span></div>
+        <p class="form-hint">Your recent login and logout activity.</p>
+        <div class="table-wrap" style="margin-top:12px;">
+            <table class="table">
+                <thead>
+                    <tr><th>#</th><th>Login Time</th><th>Logout Time</th><th>IP Address</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                    {% for log in login_history %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="muted">{{ log[2] }}</td>
+                        <td class="muted">{{ log[3] or '—' }}</td>
+                        <td class="muted">{{ log[4] or '—' }}</td>
+                        <td>
+                            {% if log[5] == 'success' %}<span class="badge badge-completed">{{ icon('check') }} {{ log[5] }}</span>
+                            {% else %}<span class="badge badge-red">{{ icon('x') }} {{ log[5] }}</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" style="text-align:center; color:var(--faint);">No activity yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if is_admin %}
+<script>
+async function testAI() {
+    var result = document.getElementById('aiTestResult');
+    result.style.color = 'var(--muted)';
+    result.textContent = 'Testing connection to Gemini...';
+    var form = document.getElementById('aiApiForm');
+    try {
+        var resp = await fetch('/settings/test-ai', { method: 'POST', body: new FormData(form) });
+        var json = await resp.json();
+        result.textContent = (json.ok ? '\u2705 ' : '\u274C ') + json.message;
+        result.style.color = json.ok ? '#4ade80' : '#f87171';
+    } catch (e) {
+        result.textContent = 'Could not reach the server test endpoint.';
+        result.style.color = '#f87171';
+    }
+}
+</script>
+{% endif %}
+{% endblock %}

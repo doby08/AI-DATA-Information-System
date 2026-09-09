@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+    (function(){
+        var t = 'dark';
+        try {
+            var s = localStorage.getItem('aisiap-theme');
+            if (s === 'light' || s === 'dark') { t = s; }
+            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) { t = 'light'; }
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t);
+    })();
+    </script>
+    <title>{% block title %}A.I.S.I.A.P. — AI-Assisted Stakeholders Interview & Analysis Portal{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23855CF8'/%3E%3Crect width='24' height='4' fill='%23FFB800'/%3E%3Ccircle cx='9' cy='15' r='5' fill='white'/%3E%3Ccircle cx='15' cy='10' r='3.5' fill='white'/%3E%3Cpath d='M4 22h16' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/aisiap.css">
+    {% block head_extra %}{% endblock %}
+</head>
+<body>
+{% from "_icons.html" import icon with context %}
+<aside class="sidebar" id="sidebar">
+    <div class="brand">
+        <div class="logo-badge">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+        </div>
+        <div class="brand-text">
+            <div class="name">A.I.S.I.A.P.</div>
+            <div class="tag">Interview &amp; Analysis Portal</div>
+        </div>
+    </div>
+    <nav class="nav">
+        <div class="nav-group">
+            <div class="group-label">Overview</div>
+            <a href="/" class="{{ 'active' if active == 'dashboard' else '' }}"><span class="ico">{{ icon('dashboard') }}</span>Dashboard</a>
+        </div>
+        <div class="nav-group">
+            <div class="group-label">Interviews</div>
+            <a href="/interview/new" class="{{ 'active' if active == 'setup' else '' }}"><span class="ico">{{ icon('pluscircle') }}</span>Interview Setup</a>
+            <a href="/conduct" class="{{ 'active' if active == 'sessions' else '' }}"><span class="ico">{{ icon('mic') }}</span>Interview Sessions</a>
+            <a href="/responses" class="{{ 'active' if active == 'responses' else '' }}"><span class="ico">{{ icon('message') }}</span>Interview Responses</a>
+            <a href="/stakeholders" class="{{ 'active' if active == 'stakeholders' else '' }}"><span class="ico">{{ icon('users') }}</span>Stakeholders</a>
+        </div>
+        <div class="nav-group">
+            <div class="group-label">AI Analysis</div>
+            <a href="/analysis" class="{{ 'active' if active == 'analysis' else '' }}"><span class="ico">{{ icon('brain') }}</span>AI Analysis</a>
+            <a href="/insights" class="{{ 'active' if active == 'insights' else '' }}"><span class="ico">{{ icon('trending') }}</span>Insights &amp; Patterns</a>
+        </div>
+        <div class="nav-group">
+            <div class="group-label">Report</div>
+            <a href="/requirements" class="{{ 'active' if active == 'requirements' else '' }}"><span class="ico">{{ icon('clipboard') }}</span>Requirements</a>
+            <a href="/interviews" class="{{ 'active' if active == 'history' else '' }}"><span class="ico">{{ icon('clock') }}</span>Interview History</a>
+        </div>
+        <div class="nav-group">
+            <div class="group-label">Administration</div>
+            <a href="/dean-staffs" class="{{ 'active' if active == 'dean_staffs' else '' }}"><span class="ico">{{ icon('shield') }}</span>Dean and Staffs</a>
+        </div>
+        <div class="nav-group">
+            <div class="group-label">Settings</div>
+            <a href="/customer-support" class="{{ 'active' if active == 'support' else '' }}"><span class="ico">{{ icon('headphones') }}</span>Customer Support</a>
+            <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}"><span class="ico">{{ icon('sliders') }}</span>Settings</a>
+            <a href="/profile" class="{{ 'active' if active == 'profile' else '' }}"><span class="ico">{{ icon('user') }}</span>My Profile</a>
+            <a href="/trash" class="{{ 'active' if active == 'trash' else '' }}"><span class="ico">{{ icon('trash') }}</span>Trash Bin</a>
+            {% if session.get('role') in PRIVILEGED_CATEGORIES %}
+            <a href="/accounts" class="{{ 'active' if active == 'accounts' else '' }}"><span class="ico">{{ icon('shield') }}</span>Manage Accounts</a>
+            {% endif %}
+        </div>
+    </nav>
+    <div class="sidebar-foot">Signed in as <strong>{{ session.get('username', 'User') }}</strong></div>
+</aside>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<main class="main">
+    <div class="topbar">
+        <div class="topbar-left">
+            <button class="menu-toggle" id="sidebarToggle" aria-label="Toggle navigation">{{ icon('menu') }}</button>
+            <div>
+                <h1>{% block page_title %}Dashboard{% endblock %}</h1>
+                <div class="sub">{% block page_sub %}{% endblock %}</div>
+            </div>
+        </div>
+        <div class="topbar-right">
+            <div class="search-box">
+                {{ icon('search') }}
+                <form id="globalSearchForm" method="GET" action="/interviews" style="display:flex; align-items:center; flex:1;">
+                    <input id="globalSearch" type="text" name="q" class="js-search" data-target="{{ search_target|default('') }}"
+                           placeholder="Search by name, role, or ID..." autocomplete="off" value="{{ request.args.get('q', '') }}">
+                </form>
+            </div>
+            <div class="notif-wrap">
+                <button class="icon-btn" id="notifBtn" aria-label="Notifications">{{ icon('bell') }}<span class="dot"></span></button>
+                <div class="notif-panel" id="notifPanel">
+                    <div class="notif-head">{{ icon('bell') }} Notifications</div>
+                    <div class="notif-empty">No new alerts. Everything is up to date.</div>
+                </div>
+            </div>
+            <button class="theme-toggle icon-btn" id="themeToggle" type="button" aria-label="Toggle light or dark mode" title="Toggle light/dark mode">
+                <svg class="t-bulb" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+                <svg class="t-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+            <div class="user-menu">
+                <button class="user-chip" id="userChip">
+                    {% if profile_pic %}
+                    <img class="avatar avatar-img" src="/static/{{ profile_pic }}" alt="Profile picture">
+                    {% else %}
+                    <div class="avatar">{{ (session.get('username', 'U') or 'U')[0]|upper }}</div>
+                    {% endif %}
+                    <div class="user-chip-info">
+                        <div class="u-name">{{ session.get('username', 'User') }}</div>
+                        <div class="u-role">{% if session.get('role') in PRIVILEGED_CATEGORIES %}Administrator{% else %}{{ session.get('role', 'Member') }}{% endif %}</div>
+                    </div>
+                    <span class="caret">{{ icon('chevron') }}</span>
+                </button>
+                <div class="user-dropdown" id="userDropdown">
+                    <div class="dropdown-header">
+                        {% if profile_pic %}
+                        <img class="avatar avatar-sm avatar-img" src="/static/{{ profile_pic }}" alt="Profile picture">
+                        {% else %}
+                        <div class="avatar avatar-sm">{{ (session.get('username', 'U') or 'U')[0]|upper }}</div>
+                        {% endif %}
+                        <div>
+                            <div class="dropdown-name">{{ session.get('username', 'User') }}</div>
+                            <div class="dropdown-role">{{ session.get('role', 'Member') }}</div>
+                        </div>
+                    </div>
+                    <a href="/profile">{{ icon('user') }} My Profile</a>
+                    <a href="/settings">{{ icon('sliders') }} Settings</a>
+                    {% if session.get('role') in PRIVILEGED_CATEGORIES %}
+                    <a href="/accounts">{{ icon('shield') }} Manage Accounts</a>
+                    {% endif %}
+                    <div class="dropdown-divider"></div>
+                    <a href="/logout" class="dropdown-logout" data-confirm="Are you sure you want to log out?">{{ icon('logout') }} Log out</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="flash {{ 'success' if category == 'success' else 'error' }}">{{ icon('info') }} {{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+</main>
+
+<script src="/static/js/aisiap.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

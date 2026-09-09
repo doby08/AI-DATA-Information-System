@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_sub %}Manage your account information and security{% endblock %}
+
+{% block content %}
+<div class="grid grid-2">
+    <div class="card">
+        <div class="card-title">ℹ️ Account Information</div>
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
+            {% if user[7] %}
+            <img src="/static/{{ user[7] }}" alt="Profile picture"
+                 style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:2px solid var(--line);">
+            {% else %}
+            <div class="avatar" style="width:64px; height:64px; font-size:26px; border-radius:50%; background:var(--accent-grad); color:#fff; display:flex; align-items:center; justify-content:center;">
+                {{ user[1][0]|upper }}
+            </div>
+            {% endif %}
+            <div>
+                <div style="font-size:18px; font-weight:700;">{{ user[1] }}</div>
+                <div style="margin:5px 0;">
+                    <span class="badge badge-blue">🏷️ {{ user[6] or 'Unspecified' }}</span>
+                    {% if user[8] %}<span class="badge badge-default" style="margin-left:6px;">🆔 Client ID: {{ user[8] }}</span>{% endif %}
+                </div>
+                <div class="muted" style="font-size:13px;">Member since {{ user[4] or '—' }}</div>
+                <div class="muted" style="font-size:12px;">Last login: {{ user[5] or '—' }}</div>
+                <a href="/settings" style="font-size:12.5px;">🖼️ Change profile picture in Settings</a>
+            </div>
+        </div>
+
+        <form method="POST" class="mb-4">
+            <input type="hidden" name="form_type" value="email">
+            <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" name="email" value="{{ user[3] or '' }}" placeholder="you@example.com">
+            </div>
+            <button type="submit" class="btn btn-primary">💾 Save Email</button>
+        </form>
+
+        <form method="POST" style="border-top:1px solid var(--line); padding-top:18px;">
+            <input type="hidden" name="form_type" value="password">
+            <div class="card-title" style="margin-bottom:12px;">🔒 Change Password</div>
+            <div class="form-group">
+                <label>Current Password</label>
+                <input type="password" name="current_password" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input type="password" name="new_password" required>
+                </div>
+                <div class="form-group">
+                    <label>Confirm New Password</label>
+                    <input type="password" name="confirm_password" required>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-warning">🔒 Change Password</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-title">🕒 Recent Login Activity</div>
+        {% if login_history %}
+        <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Login Time</th>
+                        <th>IP</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in login_history %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="muted">{{ log[2] }}</td>
+                        <td class="muted">{{ log[4] or '—' }}</td>
+                        <td>
+                            {% if log[5] == 'success' %}
+                                <span class="badge badge-green">✅ Success</span>
+                            {% else %}
+                                <span class="badge badge-red">❌ Failed</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty"><div class="big">🕒</div>No login activity yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Interview Guide — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Interview Guide{% endblock %}
+{% block page_sub %}Preparation details and the official question set for this session{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<div class="grid grid-4 mb-4">
+    <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Interview ID</div><div style="font-weight:700; margin-top:4px;">{{ meta.interview_code or 'N/A' }}</div></div>
+    <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Role</div><div style="margin-top:4px;"><span class="badge badge-purple">{{ sdata[2]|upper }}</span></div></div>
+    <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Verifier</div><div style="font-weight:700; margin-top:4px;">{{ meta.verifier_name or 'N/A' }}</div></div>
+    <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Date &amp; Time</div><div style="font-weight:700; margin-top:4px;">{{ sdata[4] }} {{ sdata[5] }}</div></div>
+</div>
+
+<div class="grid" style="grid-template-columns: minmax(0,1fr) 330px; align-items:start;">
+    <div class="card">
+        <div class="card-title"><span>{{ icon('file') }} Interview Guide — Basic Data Gathering</span></div>
+        <div class="info-note">{{ icon('info') }}<span>Use this guide to run a smooth, high-quality interview. The same question set is answered by <strong>every</strong> respondent in this session so responses can be compared and analyzed.</span></div>
+        <div class="card-title" style="font-size:13px; margin-bottom:10px;"><span>{{ icon('check') }} Tips for a Successful Interview</span></div>
+        <ul style="padding-left:18px; color:var(--muted); font-size:13px; line-height:2;">
+            <li>Find a quiet location for the interview</li>
+            <li>Ensure the participant is comfortable</li>
+            <li>Allow time for participants to think and respond fully</li>
+            <li>Take notes on key points and observations</li>
+            <li>Listen actively and be respectful</li>
+            <li>Ask follow-up questions naturally</li>
+            <li>Avoid leading questions</li>
+        </ul>
+        <div class="divider"></div>
+        <div class="card-title" style="font-size:13px; margin-bottom:12px;"><span>{{ icon('clipboard') }} Official Question Set ({{ questions|length }} questions)</span></div>
+        {% for question in questions %}
+        <div class="question-item">
+            <div class="q-head"><span class="question-num">Q{{ loop.index }}</span><span class="question-category">{{ question[5] or 'basic' }}</span></div>
+            <div class="question-text">{{ question[2] }}</div>
+        </div>
+        {% else %}
+        <div class="empty"><div class="empty-ico">{{ icon('clipboard') }}</div>No questions have been generated yet.</div>
+        {% endfor %}
+    </div>
+    <div class="card">
+        <div class="card-title" style="font-size:13px;"><span>{{ icon('play') }} Actions</span></div>
+        <a href="/interview/conduct/{{ sdata[0] }}" class="btn btn-primary btn-block mb-3">{{ icon('play') }} Start Interview</a>
+        <a href="/interview/setup/{{ sdata[0] }}" class="btn btn-outline btn-block mb-3">{{ icon('brain') }} AI Question Setup</a>
+        <a href="/interviews" class="btn btn-ghost btn-block">{{ icon('arrow') }} Back to Interviews</a>
+        {% if sdata[12] %}<div class="divider"></div><div class="muted text-sm"><strong>Department / Office:</strong> {{ sdata[12] }}</div>{% endif %}
+    </div>
+</div>
+{% endblock %}

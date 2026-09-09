@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interview Report - Print View</title>
+    <style>
+        @media print { .no-print { display: none !important; } }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+        body { padding: 30px; color: #111; }
+        .no-print {
+            position: sticky; top: 0; background: #1e293b; color: #fff;
+            padding: 14px 24px; margin: -30px -30px 22px; display: flex;
+            justify-content: space-between; align-items: center; z-index: 10;
+            border-radius: 0 0 12px 12px;
+        }
+        .no-print h1 { font-size: 18px; }
+        .no-print .btn {
+            background: linear-gradient(135deg,#6366f1,#8b5cf6); color: #fff; border: none; cursor: pointer;
+            padding: 10px 18px; border-radius: 8px; font-size: 14px; text-decoration: none; margin-left: 8px;
+        }
+        .report-head { text-align: center; margin-bottom: 26px; padding-bottom: 16px; border-bottom: 3px double #333; }
+        .report-head h2 { font-size: 22px; margin-bottom: 4px; }
+        .report-head p { color: #555; font-size: 13px; }
+        .section { margin-bottom: 22px; }
+        .section h3 { font-size: 15px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #999; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        table th, table td { border: 1px solid #bbb; padding: 8px 10px; text-align: left; }
+        table th { background: #f0f0f0; }
+        .summary-box { background: #f8fafc; border: 1px solid #ddd; padding: 14px; border-radius: 8px; font-size: 13px; white-space: pre-wrap; }
+        ul.dotted { list-style: none; margin-left: 0; }
+        ul.dotted li { padding: 6px 0 6px 18px; position: relative; font-size: 13.5px; border-bottom: 1px dotted #ccc; }
+        ul.dotted li::before { content: "•"; position: absolute; left: 2px; color: #6366f1; font-weight: bold; }
+        .meta-row { display: flex; justify-content: space-between; font-size: 13px; color: #333; margin-bottom: 4px; }
+        .footer { margin-top: 26px; border-top: 1px solid #999; padding-top: 10px; font-size: 11px; color: #666; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <h1>🎙️ Interview Summary Report</h1>
+        <div>
+            <button class="btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+            <a class="btn" href="/interview/report/{{ session[0] }}/download">⬇ Download</a>
+            <a class="btn" style="background:#64748b;" href="/reports">← Back</a>
+        </div>
+    </div>
+
+    <div class="report-head">
+        <h2>AI-ASSISTED STAKEHOLDERS INTERVIEW &amp; ANALYSIS PORTAL</h2>
+        <p>Interview Summary Report — Generated: {{ generated_at }}</p>
+    </div>
+
+    <div class="section">
+        <h3>📋 Interview Details</h3>
+        <div class="meta-row"><span>Interview ID:</span> <strong>{{ sdata[11] or 'N/A' }}</strong></div>
+        <div class="meta-row"><span>Interview Title:</span> <strong>{{ sdata[1] }}</strong></div>
+        <div class="meta-row"><span>Participant Role:</span> <strong>{{ sdata[2]|upper }}</strong></div>
+        <div class="meta-row"><span>Verifier:</span> <strong>{{ sdata[3] or 'N/A' }}</strong></div>
+        <div class="meta-row"><span>Department / Office:</span> <strong>{{ sdata[12] or 'N/A' }}</strong></div>
+        <div class="meta-row"><span>Date:</span> <strong>{{ sdata[4] or 'N/A' }}</strong></div>
+        <div class="meta-row"><span>Time:</span> <strong>{{ sdata[5] or 'N/A' }}</strong></div>
+        {% if sdata[7] %}<div class="meta-row"><span>Completed At:</span> <strong>{{ sdata[7] }}</strong></div>{% endif %}
+    </div>
+
+    <div class="section">
+        <h3>🧠 AI Summary</h3>
+        <div class="summary-box">{{ report[2] if report else 'No summary generated.' }}</div>
+    </div>
+
+    <div class="section">
+        <h3>📌 Pain Points</h3>
+        {% if pain_points %}
+        <ul class="dotted">{% for p in pain_points %}<li>{{ p }}</li>{% endfor %}</ul>
+        {% else %}<p class="muted">None identified.</p>{% endif %}
+    </div>
+
+    <div class="section">
+        <h3>✨ Desired Features</h3>
+        {% if desired_features %}
+        <ul class="dotted">{% for f in desired_features %}<li>{{ f }}</li>{% endfor %}</ul>
+        {% else %}<p class="muted">None identified.</p>{% endif %}
+    </div>
+
+    <div class="section">
+        <h3>🔁 Recurring Issues</h3>
+        {% if recurring_issues %}
+        <ul class="dotted">{% for i in recurring_issues %}<li>{{ i }}</li>{% endfor %}</ul>
+        {% else %}<p class="muted">None identified.</p>{% endif %}
+    </div>
+
+    <div class="section">
+        <h3>💡 Suggested Solutions</h3>
+        {% if suggested_solutions %}
+        <table>
+            <thead><tr><th style="width:32%;">Finding</th><th style="width:15%;">Source</th><th>Suggested Solution</th></tr></thead>
+            <tbody>
+                {% for s in suggested_solutions %}
+                <tr>
+                    <td><strong>{{ s.issue }}</strong></td>
+                    <td>{{ s.source }}</td>
+                    <td>{{ s.solution }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="muted">No suggested solutions generated.</p>{% endif %}
+    </div>
+
+    <div class="section">
+        <h3>🤖 Automated Recommendations &amp; Actionable Insights</h3>
+        {% if recommendations %}
+        <table>
+            <thead><tr><th style="width:26%;">Recommendation</th><th style="width:12%;">Priority</th><th>Action to Take</th></tr></thead>
+            <tbody>
+                {% for r in recommendations %}
+                <tr>
+                    <td><strong>{{ r.title }}</strong></td>
+                    <td>{{ r.priority }}</td>
+                    <td>{{ r.action }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p class="muted">No recommendations generated.</p>{% endif %}
+    </div>
+
+    <div class="section">
+        <h3>💬 Interview Responses</h3>
+        {% if responses %}
+        <table>
+            <thead><tr><th>Question</th><th>Response</th></tr></thead>
+            <tbody>
+                {% for q, r in responses %}
+                <tr><td>{{ q }}</td><td>{{ r or '—' }}</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}<p>No responses recorded.</p>{% endif %}
+    </div>
+
+    <div class="footer">
+        AI-ASSISTED STAKEHOLDERS INTERVIEW &amp; ANALYSIS PORTAL • Generated {{ generated_at }}
+    </div>
+</body>
+</html>

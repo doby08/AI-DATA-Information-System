@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Set Up New Interview — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Set Up New Interview{% endblock %}
+{% block page_sub %}Configure the interview session and its official AI question set{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<div class="steps">
+    <div class="step active"><span class="step-num">1</span> Configure Interview</div>
+    <span class="step" style="background:none;border:none;">›</span>
+    <div class="step"><span class="step-num">2</span> AI Question Set</div>
+    <span class="step" style="background:none;border:none;">›</span>
+    <div class="step"><span class="step-num">3</span> Interview Session</div>
+    <span class="step" style="background:none;border:none;">›</span>
+    <div class="step"><span class="step-num">4</span> AI Analysis</div>
+</div>
+
+<div class="grid" style="grid-template-columns: minmax(0,1fr) 320px; align-items:start;">
+    <div class="card">
+        <div class="card-title"><span>{{ icon('pluscircle') }} Interview Configuration</span></div>
+        <div class="info-note">{{ icon('info') }}
+            <span>This interview is designed for basic data gathering to understand the needs and perspectives of
+            stakeholders. The question set you generate here becomes the <strong>official question set</strong> — every
+            respondent in this session will answer exactly these questions.</span>
+        </div>
+
+        <form method="POST" id="interviewForm">
+            <div class="card-title" style="font-size:13px; margin-bottom:12px;"><span>{{ icon('target') }} Interview Information</span></div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="title">Interview Title <span class="required">*</span></label>
+                    <input type="text" id="title" name="title" placeholder="e.g., Student Learning System" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="user_role">Stakeholder Role <span class="required">*</span></label>
+                    <select id="user_role" name="user_role" required>
+                        <option value="">— Select category —</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-hint">Sessions are grouped by category in the Interview History.</div>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="num_respondents">Number of Respondents</label>
+                    <input type="number" id="num_respondents" name="num_respondents" min="1" max="999" value="1" required>
+                    <div class="form-hint">How many interviewees will answer this session.</div>
+                </div>
+                <div class="form-group">
+                    <label for="num_questions">Number of Questions</label>
+                    <input type="number" id="num_questions" name="num_questions" min="1" max="15" value="{{ defaults.num_questions if defaults else 5 }}" required>
+                    <div class="form-hint">AI will generate exactly this many questions — every respondent answers the same set.</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="interview_objectives">Interview Objectives</label>
+                <textarea id="interview_objectives" name="interview_objectives" rows="2"
+                          placeholder="e.g., Gather requirements and identify pain points in the current Student Learning System."></textarea>
+                <div class="form-hint">The AI uses the title, role, and objectives to generate relevant questions.</div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="card-title" style="font-size:13px; margin-bottom:12px;"><span>{{ icon('check') }} Verification Details</span></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="verifier_name">Full Name of Respondent <span class="required">*</span></label>
+                    <input type="text" id="verifier_name" name="verifier_name" value="{{ defaults.verifier_name if defaults else '' }}" placeholder="Enter the full name of the respondent" required>
+                </div>
+                <div class="form-group">
+                    <label for="verifier_department">Department / College / Office</label>
+                    <input type="text" id="verifier_department" name="verifier_department" value="{{ defaults.verifier_department if defaults and defaults.verifier_department else '' }}" placeholder="e.g., College of Engineering, Registrar Office">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="verifier_date">Interview Date <span class="required">*</span></label>
+                    <input type="date" id="verifier_date" name="verifier_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="verifier_time">Interview Time <span class="required">*</span></label>
+                    <input type="time" id="verifier_time" name="verifier_time" required>
+                </div>
+            </div>
+<div class="form-group mt-3">
+                <label for="additional_instructions">Additional Instructions (optional)</label>
+                <textarea id="additional_instructions" name="additional_instructions" rows="2"
+                          placeholder="Anything the interviewer should keep in mind during the session."></textarea>
+            </div>
+
+            <div class="flex" style="justify-content:flex-end; gap:10px; margin-top:20px;">
+                <a href="/interviews" class="btn btn-outline">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg" id="generateBtn">
+                    {{ icon('sparkles') }} Generate AI Questions
+                </button>
+            </div>
+        </form>
+    </div>
+    <div>
+        <div class="card mb-3">
+            <div class="card-title" style="font-size:13px;"><span>{{ icon('brain') }} How it works</span></div>
+            <ol style="padding-left:18px; color:var(--muted); font-size:12.5px; line-height:1.9;">
+                <li>Fill in the interview details and the <strong>question count</strong>.</li>
+                <li>Click <strong>Generate AI Questions</strong> — the AI drafts exactly that many questions.</li>
+                <li>Review, edit, or regenerate the question set.</li>
+                <li>Save the set — it becomes the official set for the session.</li>
+                <li>Conduct the session; every respondent answers the same questions.</li>
+            </ol>
+        </div>
+        <div class="warn-note" style="margin-bottom:0;">
+            {{ icon('lock') }}
+            <span>Question count is configured by the administrator (Dean / staff) during setup. Respondents can only
+            answer the questions assigned to their session.</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var form = document.getElementById('interviewForm');
+        var btn = document.getElementById('generateBtn');
+        if (!form || !btn) return;
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            btn.innerHTML = 'Generating questions…';
+        });
+    })();
+</script>
+{% endblock %}

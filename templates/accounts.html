@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% set search_target = 'accountsTable' %}
+{% block title %}Manage Accounts{% endblock %}
+{% block page_title %}Manage Accounts{% endblock %}
+{% block page_sub %}Create and manage user accounts (Dean, Staff, and other positions){% endblock %}
+
+{% block content %}
+<div class="grid grid-2 mb-4">
+    <div class="card">
+        <div class="card-title">➕ Create New Account</div>
+        <p class="muted" style="font-size:13px; margin-bottom:14px;">
+            Use this to create accounts for Dean, Faculty, Staff, Department Head, Guidance Counselor,
+            Registrar, Accounting, Cashier, or Students. Share the username and password with the user.
+        </p>
+        <form method="POST" action="/accounts/create">
+            <div class="form-group">
+                <label>Username</label>
+                <input type="text" name="username" required placeholder="e.g., juan.delacruz">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Temporary Password</label>
+                    <input type="password" name="password" required minlength="6" placeholder="min. 6 characters">
+                </div>
+                <div class="form-group">
+                    <label>Account Category</label>
+                    <select name="role" required>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Email (optional — needed for forgot-password reset)</label>
+                <input type="email" name="email" placeholder="name@example.com">
+            </div>
+            <button type="submit" class="btn btn-primary">✅ Create Account</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-title">ℹ️ How accounts work</div>
+        <ul style="list-style:none; font-size:13.5px; line-height:2;">
+            <li>🚫 The public <a href="/register">Register page</a> only allows <strong>Student</strong> and <strong>Applicant</strong> sign-ups.</li>
+            <li>🛡️ Only Dean, Faculty, Staff Employee, Department Head/Program Chair, and Guidance Counselor accounts can open this page.</li>
+            <li>✏️ Staff-level accounts can edit/delete any interview session (including students' sessions).</li>
+            <li>🔑 "Reset Password" sets a new password the user can change later in their Profile.</li>
+            <li>🏷️ The Category controls what the user must select when logging in ("Login as").</li>
+        </ul>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">👤 All User Accounts ({{ users|length }})
+        <input type="text" id="accountSearch" placeholder="🔍 Search by name or Client ID..." oninput="filterAccounts()"
+               style="width:260px; padding:8px 12px; border:1.5px solid var(--line); border-radius:8px; font-size:13px;">
+    </div>
+    <div class="table-wrap adaptive-table" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table" id="accountsTable">
+            <thead>
+                <tr>
+                    <th>#</th><th>Username</th><th>Client ID</th><th>Category</th><th>Email</th><th>Created</th><th>Last Login</th><th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td data-label="#">{{ u[0] }}</td>
+                    <td data-label="Username">
+                        <strong>{{ u[1] }}</strong>
+                        {% if u[0] == current_user_id %}<span class="badge badge-blue">you</span>{% endif %}
+                        {% if not u[2] %}<span class="badge badge-planning" title="They must pick Student/Applicant at login, or set a category here">⚠ no category</span>{% endif %}
+                    </td>
+                    <td data-label="Client ID"><span class="badge badge-default">{{ u[6] or '—' }}</span></td>
+                    <td data-label="Category">
+                        <form method="POST" action="/accounts/{{ u[0] }}/role" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                            <select name="role" style="padding:5px 8px; border:1.5px solid var(--line); border-radius:8px; font-size:12.5px; max-width:100%;">
+                                {% if not u[2] %}<option value="" selected>— pick one —</option>{% endif %}
+                                {% for cat in categories %}
+                                <option value="{{ cat }}" {{ 'selected' if cat == u[2] else '' }}>{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-ghost btn-sm">Save</button>
+                        </form>
+                    </td>
+                    <td class="muted" data-label="Email" style="font-size:12.5px;">{{ u[3] or '—' }}</td>
+                    <td class="muted" data-label="Created" style="font-size:12.5px;">{{ u[4] or '—' }}</td>
+                    <td class="muted" data-label="Last Login" style="font-size:12.5px;">{{ u[5] or '—' }}</td>
+                    <td data-label="Actions">
+                        <div class="actions" style="flex-direction:column; gap:7px; align-items:stretch; min-width:174px;">
+                            <form method="POST" action="/accounts/{{ u[0] }}/reset-password" style="display:flex; gap:5px; align-items:center; flex-wrap:nowrap;">
+                                <input type="password" name="new_password" placeholder="New password" required minlength="6" aria-label="New password for {{ u[1] }}"
+                                       style="padding:5px 7px; border:1.5px solid var(--line); border-radius:8px; font-size:12.5px; width:102px; flex:none;">
+                                <button type="submit" class="btn btn-warning btn-sm" style="flex:none; white-space:nowrap;">🔑 Reset</button>
+                            </form>
+                            {% if u[0] != current_user_id %}
+                            <form method="POST" action="/accounts/{{ u[0] }}/delete" onsubmit="return confirm('Delete this account? This cannot be undone.')">
+                                <button type="submit" class="btn btn-danger btn-sm" style="width:100%; white-space:nowrap;">🗑️ Delete</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+<script>
+    function filterAccounts() {
+        const q = document.getElementById('accountSearch').value.toLowerCase().trim();
+        const rows = document.querySelectorAll('#accountsTable tbody tr');
+        rows.forEach(function (row) {
+            const text = ((row.cells[1].textContent || '') + ' ' + (row.cells[2].textContent || '')).toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+        });
+    }
+</script>
+{% endblock %}

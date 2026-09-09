@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Interview Report — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Interview Report{% endblock %}
+{% block page_sub %}AI analysis and full transcript for this session{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<div class="flex-between mb-4 no-print">
+    <div class="muted text-sm"><strong>{{ sdata[1] }}</strong> &nbsp;&bull;&nbsp; {{ meta.interview_code or 'N/A' }} &nbsp;&bull;&nbsp; {{ sdata[2]|upper }}</div>
+    <div class="actions">
+        <a href="/interviews" class="btn btn-outline btn-sm">Back to Interviews</a>
+        <a href="/interview/report/{{ sdata[0] }}/print" target="_blank" class="btn btn-ghost btn-sm">{{ icon('print') }} Print / PDF</a>
+        <a href="/interview/report/{{ sdata[0] }}/download" class="btn btn-success btn-sm">{{ icon('download') }} Download (Word)</a>
+    </div>
+</div>
+
+<!-- Respondent Bar -->
+<div class="card mb-4" style="padding: 16px 20px;">
+    <div class="flex-between" style="gap: 16px; flex-wrap: wrap;">
+        <div class="flex" style="gap: 10px; align-items: center;">
+            <div class="avatar" style="width: 36px; height: 36px; font-size: 14px;">{{ (respondent_name or 'U')[0]|upper }}</div>
+            <div>
+                <div style="font-weight: 700; font-size: 15px; color: var(--ink-strong);">{{ respondent_name or 'Unknown' }}</div>
+                <div class="muted text-sm">{{ sdata[2]|upper }} &bull; Respondent</div>
+            </div>
+        </div>
+        <div class="muted text-sm" style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <span>{{ sdata[4] or '—' }}</span>
+            <span>{{ sdata[5] or '—' }}</span>
+            <span>{{ response_duration }} min</span>
+            <span>{{ meta.verifier_department or '' }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-4 mb-4">
+    <div class="kpi"><div class="kpi-top"><div class="kpi-ico">{{ icon('message') }}</div></div><div class="kpi-num">{{ responses|length }}</div><div class="kpi-label">Total Responses</div></div>
+    <div class="kpi" style="--kpi-accent:#ef4444;"><div class="kpi-top"><div class="kpi-ico">{{ icon('alert') }}</div></div><div class="kpi-num">{{ pain_points|length }}</div><div class="kpi-label">Pain Points</div></div>
+    <div class="kpi" style="--kpi-accent:#22c55e;"><div class="kpi-top"><div class="kpi-ico">{{ icon('check') }}</div></div><div class="kpi-num">{{ desired_features|length }}</div><div class="kpi-label">Desired Features</div></div>
+    <div class="kpi" style="--kpi-accent:#f59e0b;"><div class="kpi-top"><div class="kpi-ico">{{ icon('refresh') }}</div></div><div class="kpi-num">{{ recurring_issues|length }}</div><div class="kpi-label">Recurring Issues</div></div>
+</div>
+
+{% if report %}
+<div class="card section-card"><h2>{{ icon('file') }} Executive Summary</h2><div style="white-space:pre-wrap; color:var(--ink); line-height:1.65;">{{ report[2] }}</div></div>
+{% endif %}
+
+{% if pain_points %}
+<div class="card section-card"><h2>{{ icon('alert') }} Pain Points Identified</h2>
+{% for point in pain_points %}<div class="answer-box" style="border-left:3px solid var(--danger);">{{ point }}</div>{% endfor %}</div>
+{% endif %}
+
+{% if desired_features %}
+<div class="card section-card"><h2>{{ icon('check') }} Desired Features &amp; Improvements</h2>
+{% for feature in desired_features %}<div class="answer-box" style="border-left:3px solid var(--success);">{{ feature }}</div>{% endfor %}</div>
+{% endif %}
+
+{% if recurring_issues %}
+<div class="card section-card"><h2>{{ icon('refresh') }} Recurring Issues</h2>
+{% for issue in recurring_issues %}<div class="answer-box" style="border-left:3px solid var(--warn);">{{ issue }}</div>{% endfor %}</div>
+{% endif %}
+
+{% if suggested_solutions %}
+<div class="card section-card"><h2>{{ icon('sparkles') }} AI Suggested Solutions</h2>
+{% for s in suggested_solutions %}
+<div class="answer-box" style="border-left:3px solid var(--accent);">
+<div class="text-sm" style="color:var(--accent-2); font-weight:700; text-transform:uppercase; letter-spacing:.8px;">{{ s.source }}</div>
+<div style="font-weight:600; margin:5px 0;">{{ s.issue }}</div><div class="muted">{{ s.solution }}</div></div>
+{% endfor %}</div>
+{% endif %}
+
+{% if recommendations %}
+<div class="card section-card"><h2>{{ icon('brain') }} Automated Recommendations &amp; Actionable Insights</h2>
+<p class="muted text-sm" style="margin-bottom:12px;">Prioritized next steps generated automatically from this interview's findings.</p>
+{% for r in recommendations %}
+<div class="answer-box" style="border-left:3px solid var(--success);">
+<div class="flex-between"><strong>{{ loop.index }}. {{ r.title }}</strong>
+{% if r.priority == 'High' %}<span class="badge badge-red">{{ r.priority }} Priority</span>{% elif r.priority == 'Low' %}<span class="badge badge-blue">{{ r.priority }} Priority</span>{% else %}<span class="badge badge-planning">{{ r.priority }} Priority</span>{% endif %}</div>
+<div style="margin-top:6px;">{{ r.action }}</div>
+<div class="muted text-sm" style="margin-top:6px; font-style:italic;">Based on: {{ r.based_on }}</div></div>
+{% endfor %}</div>
+{% endif %}
+
+<div class="card section-card">
+<h2>{{ icon('clipboard') }} Responses by Question</h2>
+<p class="muted text-sm" style="margin-bottom:14px;">All respondents answered the same saved question set &mdash; compare their answers side-by-side below.</p>
+{% if grouped_by_question %}
+{% for group in grouped_by_question %}
+<div class="question-item">
+<div class="q-head"><span class="question-num">Q{{ loop.index }}</span><span class="question-text" style="font-weight:600;">{{ group.question }}</span></div>
+{% for r in group.responses %}
+<div class="answer-box">
+<div class="flex-between" style="margin-bottom:8px;">
+<span class="respondent-chip"><span class="r-dot"></span> Respondent {{ loop.index }}</span>
+<div class="actions no-print">
+<button class="btn btn-outline btn-sm" onclick="editResponse({{ loop.index0 }}, '{{ group.question|escape }}', '{{ r.response|escape }}')">{{ icon('edit') }} Edit</button>
+<button class="btn btn-danger btn-sm" onclick="deleteResponse({{ loop.index0 }})">{{ icon('trash') }} Delete</button>
+</div>
+</div>
+<div class="a-text" id="response-text-{{ loop.index0 }}">{{ r.response or '(no response recorded)' }}</div>
+{% if r.key_points %}<div class="a-points">{% for kp in r.key_points[:3] %}<span class="badge badge-default">{{ kp }}</span>{% endfor %}</div>{% endif %}
+</div>
+{% endfor %}
+</div>
+{% endfor %}
+{% else %}
+<div class="empty"><div class="empty-ico">{{ icon('message') }}</div>No responses recorded for this interview.</div>
+{% endif %}
+</div>
+
+<!-- Repeat Interview Button -->
+<div class="card section-card no-print">
+<div class="flex-between">
+<div>
+<h3 style="margin-bottom:4px;">{{ icon('repeat') }} Repeat Interview</h3>
+<p class="muted text-sm">Start a new round of responses for this same question set.</p>
+</div>
+<a href="/interview/conduct/{{ sdata[0] }}" class="btn btn-primary">{{ icon('mic') }} Start New Round</a>
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editResponse(index, question, response) {
+    const newResponse = prompt('Edit your response:', response);
+    if (newResponse !== null && newResponse.trim() !== '') {
+        fetch('/api/edit-response', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: {{ sdata[0] }},
+                response_index: index,
+                response_text: newResponse
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                document.getElementById('response-text-' + index).textContent = newResponse;
+                if (window.aisiapToast) window.aisiapToast('Response updated successfully!', 'success');
+            } else {
+                if (window.aisiapToast) window.aisiapToast('Error updating response.', 'err');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            if (window.aisiapToast) window.aisiapToast('Error updating response.', 'err');
+        });
+    }
+}
+
+function deleteResponse(index) {
+    if (confirm('Are you sure you want to delete this response? This action cannot be undone.')) {
+        fetch('/api/delete-response', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: {{ sdata[0] }},
+                response_index: index
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                if (window.aisiapToast) window.aisiapToast('Error deleting response.', 'err');
+            }
+        })
+        .catch(err => {
+            console.error('Error:', err);
+            if (window.aisiapToast) window.aisiapToast('Error deleting response.', 'err');
+        });
+    }
+}
+</script>
+{% endblock %}

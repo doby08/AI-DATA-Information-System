@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+    (function(){
+        var t = 'dark';
+        try {
+            var s = localStorage.getItem('aisiap-theme');
+            if (s === 'light' || s === 'dark') { t = s; }
+            else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) { t = 'light'; }
+        } catch (e) {}
+        document.documentElement.setAttribute('data-theme', t);
+    })();
+    </script>
+    <title>Register — A.I.S.I.A.P.</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/aisiap.css">
+</head>
+<body class="auth-body">
+    <button class="theme-toggle theme-toggle-fab" id="themeToggle" type="button" aria-label="Toggle light or dark mode" title="Toggle light/dark mode" onclick="toggleTheme()">
+        <svg class="t-bulb" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
+        <svg class="t-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+    <div class="auth-card">
+        <div class="auth-logo">
+            <div class="logo-badge">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            </div>
+        </div>
+        <h1>Create Account</h1>
+        <p class="auth-sub">Register to participate in stakeholder interviews</p>
+
+        {% if error %}
+            <div class="flash error" style="margin-bottom:16px;">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autofocus>
+                <div class="form-hint">Choose a unique username</div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="role">Account Category</label>
+                <select id="role" name="role" required class="auth-category-select">
+                    <option value="">-- Select your category --</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+                <div class="form-hint">Only Student and Applicant accounts can self-register. Accounts for Dean,
+                Staff, and other positions are created by the administrator.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+                <div class="form-hint">Use a strong password for security</div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block">Register</button>
+        </form>
+
+        <div class="auth-alt">Already have an account? <a href="/login">Login here</a></div>
+    </div>
+
+    <script>
+        function toggleTheme() {
+            var root = document.documentElement;
+            var next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+            root.setAttribute("data-theme", next);
+            try { localStorage.setItem("aisiap-theme", next); } catch (e) {}
+        }
+    </script>
+</body>
+</html>

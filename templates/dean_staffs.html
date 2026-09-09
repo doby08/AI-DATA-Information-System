@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Dean and Staffs — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Dean and Staffs{% endblock %}
+{% block page_sub %}View all reports, support tickets, and suggestions from users{% endblock %}
+
+{% block head_extra %}
+<style>
+    .staff-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 1300px) { .staff-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 1000px) { .staff-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 620px) { .staff-grid { grid-template-columns: 1fr; } }
+    .staff-card { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 18px 16px; }
+    .staff-avatar { width: 88px; height: 88px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; flex: none; }
+    .staff-avatar img { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(59,130,246,.25); }
+    .staff-avatar .init { width: 88px; height: 88px; border-radius: 50%; background: var(--accent-grad); color: #fff; font-size: 34px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .staff-name { font-size: 16.5px; font-weight: 700; color: var(--ink-strong); }
+    .staff-role { font-size: 11px; font-weight: 700; color: var(--accent-2); text-transform: uppercase; letter-spacing: .6px; margin-top: 3px; }
+    .staff-boxes { display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 12px; }
+    .staff-box { display: flex; align-items: center; gap: 8px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; font-size: 12px; }
+    .staff-box .sb-ico { font-size: 14px; flex: none; }
+    .staff-box .sb-label { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .4px; }
+    .staff-box .sb-val { color: var(--ink); font-weight: 600; margin-left: auto; text-align: right; word-break: break-all; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<!-- Dean & Staff Members Directory -->
+<div class="grid mb-4">
+    <div class="card">
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>{{ icon('shield') }} Dean &amp; Staff Members <span class="sub">{{ staff_members|length }} member(s)</span></span>
+            <span style="pointer-events:none; font-size:11.5px; font-weight:700; background:rgba(59,130,246,.1); color:#93c5fd; border:1px solid rgba(59,130,246,.3); border-radius:30px; padding:4px 12px;">Total: {{ staff_members|length }}</span>
+        </div>
+        {% if staff_members %}
+        <div class="staff-grid">
+            {% for m in staff_members %}
+            <div class="card card-hover staff-card">
+                <div class="staff-avatar">
+                    {% if m[4] %}
+                    <img src="/static/{{ m[4] }}" alt="{{ m[1] }}">
+                    {% else %}
+                    <div class="init">{{ (m[1] or '?')[0]|upper }}</div>
+                    {% endif %}
+                </div>
+                <div class="staff-name">{{ m[1] }}</div>
+                <div class="staff-role">{{ m[3] or 'Staff' }}</div>
+                <div class="staff-boxes">
+                    <div class="staff-box"><span class="sb-ico">&#9993;</span><span class="sb-label">Email</span><span class="sb-val">{{ m[2] or '—' }}</span></div>
+                    <div class="staff-box"><span class="sb-ico">&#128197;</span><span class="sb-label">Member Since</span><span class="sb-val">{{ m[5] or '—' }}</span></div>
+                    <div class="staff-box"><span class="sb-ico">&#128100;</span><span class="sb-label">Client ID</span><span class="sb-val">{{ m[6] or '—' }}</span></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty"><div>🛡️</div>No staff members found.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid mb-4">
+    <!-- Support Tickets Section -->
+    <div class="card">
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+            {{ icon('headphones') }} All Support Tickets
+            {% if tickets %}
+            <form method="POST" action="/dean-staffs/clear-all-tickets" onsubmit="return confirm('Are you sure you want to delete ALL tickets? This cannot be undone.');">
+                <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.15); color:#ef4444; border:1px solid rgba(239,68,68,.3);">Clear All</button>
+            </form>
+            {% endif %}
+        </div>
+        {% if tickets %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Submitted By</th>
+                        <th>Category</th>
+                        <th>Subject</th>
+                        <th>Message</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tickets %}
+                    <tr>
+                        <td>{{ t[0] }}</td>
+                        <td>{{ t[1] }}</td>
+                        <td class="muted">{{ t[2]|replace('_', ' ')|title if t[2] else '—' }}</td>
+                        <td>{{ t[3] }}</td>
+                        <td class="muted">{{ t[4][:80] }}{% if t[4]|length > 80 %}...{% endif %}</td>
+                        <td>
+                            {% if t[5] == 'urgent' %}
+                                <span class="badge badge-red">Urgent</span>
+                            {% elif t[5] == 'high' %}
+                                <span class="badge badge-in_progress">High</span>
+                            {% elif t[5] == 'medium' %}
+                                <span class="badge badge-planning">Medium</span>
+                            {% else %}
+                                <span class="badge badge-default">Low</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if t[6] == 'open' %}
+                                <span class="badge badge-in_progress">Open</span>
+                            {% elif t[6] == 'resolved' %}
+                                <span class="badge badge-completed">Resolved</span>
+                            {% elif t[6] == 'in_progress' %}
+                                <span class="badge badge-planning">In Progress</span>
+                            {% else %}
+                                <span class="badge badge-default">{{ t[6]|upper }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="muted">{{ t[7] }}</td>
+                        <td>
+                            <form method="POST" action="/dean-staffs/clear-ticket/{{ t[0] }}" onsubmit="return confirm('Delete this ticket?');">
+                                <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.1); color:#ef4444; border:1px solid rgba(239,68,68,.3);">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty"><div>📭</div>No support tickets submitted yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid mb-4">
+    <!-- Suggestions Section -->
+    <div class="card">
+        <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+            {{ icon('lightbulb') }} All Suggestions
+            {% if suggestions %}
+            <form method="POST" action="/dean-staffs/clear-all-suggestions" onsubmit="return confirm('Are you sure you want to delete ALL suggestions? This cannot be undone.');">
+                <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.15); color:#ef4444; border:1px solid rgba(239,68,68,.3);">Clear All</button>
+            </form>
+            {% endif %}
+        </div>
+        {% if suggestions %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Submitted By</th>
+                        <th>Type</th>
+                        <th>Title</th>
+                        <th>Suggestion</th>
+                        <th>Benefit</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                                <tbody>
+                    {% for s in suggestions %}
+                    <tr>
+                        <td>{{ s[0] }}</td>
+                        <td>{{ s[1] }}</td>
+                        <td><span class="badge badge-blue">{{ s[2]|replace('_', ' ')|upper if s[2] else 'OTHER' }}</span></td>
+                        <td>{{ s[3] }}</td>
+                        <td class="muted">{{ s[4][:80] }}{% if s[4]|length > 80 %}...{% endif %}</td>
+                        <td>{{ s[5]|replace('_', ' ')|title if s[5] else '—' }}</td>
+                        <td>
+                            {% if s[6] == 'pending' %}
+                                <span class="badge badge-planning">Pending</span>
+                            {% elif s[6] == 'implemented' %}
+                                <span class="badge badge-completed">Implemented</span>
+                            {% elif s[6] == 'under_review' %}
+                                <span class="badge badge-in_progress">Under Review</span>
+                            {% else %}
+                                <span class="badge badge-default">{{ s[6]|upper }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="muted">{{ s[7] }}</td>
+                        <td>
+                            <form method="POST" action="/dean-staffs/clear-suggestion/{{ s[0] }}" onsubmit="return confirm('Delete this suggestion?');">
+                                <button type="submit" class="btn btn-sm" style="background:rgba(239,68,68,.1); color:#ef4444; border:1px solid rgba(239,68,68,.3);">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty"><div>💡</div>No suggestions submitted yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="grid">
+    <!-- Interview Reports Section -->
+    <div class="card">
+        <div class="card-title">{{ icon('clipboard') }} Interview Reports</div>
+        {% if reports %}
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Title</th>
+                        <th>Date Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in reports %}
+                    <tr>
+                        <td>{{ r[0] }}</td>
+                        <td>{{ r[1] }}</td>
+                        <td class="muted">{{ r[2] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty"><div>📄</div>No interview reports found.</div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Summary Reports{% endblock %}
+{% block page_title %}Summary Reports{% endblock %}
+{% block page_sub %}All generated AI summary reports with print & download options{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">Generated Reports
+        <div style="display:flex; gap:6px;">
+            <a href="/export/reports/csv" class="btn btn-outline btn-sm">⬇ Export All CSV</a>
+        </div>
+    </div>
+    {% if reports %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Interview ID</th>
+                    <th>Interview</th>
+                    <th>Role</th>
+                    <th>Verifier</th>
+                    <th>Generated</th>
+                    <th class="muted">Summary Preview</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reports %}
+                <tr>
+                    <td>{{ r[0] }}</td>
+                    <td><span class="badge badge-default">🆔 {{ r[7] or 'N/A' }}</span></td>
+                    <td>{{ r[2] }}</td>
+                    <td><span class="badge badge-purple">{{ r[3]|upper }}</span></td>
+                    <td>{{ r[4] or 'N/A' }}</td>
+                    <td class="muted">{{ r[5] }}</td>
+                    <td class="muted">{{ (r[6] or '')[:70] }}{% if (r[6] or '')|length > 70 %}...{% endif %}</td>
+                    <td>
+                        <div class="actions">
+                            <a href="/interview/report/{{ r[1] }}" class="btn btn-ghost btn-sm">👁️ View</a>
+                            <a href="/interview/report/{{ r[1] }}/print" target="_blank" class="btn btn-outline btn-sm">🖨️ Print/PDF</a>
+                            <a href="/interview/report/{{ r[1] }}/download" class="btn btn-success btn-sm">⬇ Download</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="big">📑</div>
+        No summary reports yet.<br>
+        <span class="muted">Complete an interview to generate an AI summary report.</span>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

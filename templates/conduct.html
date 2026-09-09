@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Interview Sessions — A.I.S.I.A.P.{% endblock %}
+{% block page_title %}Interview Sessions{% endblock %}
+{% block page_sub %}Active sessions ready to be conducted — same saved question set for every respondent{% endblock %}
+{% block content %}
+{% from "_icons.html" import icon with context %}
+
+<div class="flex-between mb-4">
+    <div class="info-note" style="margin-bottom:0;">
+        {{ icon('info') }}
+        <span>Start a session to record each respondent's answers to the official question set. Every respondent in the
+        same session answers exactly the same questions.</span>
+    </div>
+    <a href="/interview/new" class="btn btn-primary">{{ icon('plus') }} Set Up New Interview</a>
+</div>
+
+<div class="card">
+    <div class="card-title">
+        <span>{{ icon('mic') }} Active Interview Sessions</span>
+        <a href="/interviews" class="btn btn-ghost btn-sm">{{ icon('arrow') }} View History</a>
+    </div>
+    {% if sessions %}
+    <div class="table-wrap adaptive-table">
+        <table class="table">
+            <thead>
+                <tr><th>Title</th><th>Role</th><th>Verifier</th><th>Status</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+                {% for session, can_manage in session_items %}
+                <tr>
+                    <td data-label="Title">
+                        <div class="row-main">{{ session[1] }}</div>
+                        {% if session[11] %}<div class="row-sub">{{ session[11] }}</div>{% endif %}
+                    </td>
+                    <td data-label="Role"><span class="badge badge-purple">{{ session[2]|upper }}</span></td>
+                    <td data-label="Verifier">{{ session[3] or '—' }}</td>
+                    <td data-label="Status">
+                        {% if session[8] == 'planning' %}<span class="badge badge-planning">{{ icon('target') }} Planning</span>
+                        {% elif session[8] == 'in_progress' %}<span class="badge badge-in_progress">{{ icon('play') }} In Progress</span>
+                        {% else %}<span class="badge badge-completed">{{ icon('check') }} Completed</span>{% endif %}
+                    </td>
+                    <td data-label="Action">
+                        <div class="actions">
+                            {% if not can_manage %}
+                                <span class="muted text-sm">{{ icon('lock') }} View only</span>
+                                <a href="/interview/prepare/{{ session[0] }}" class="btn btn-outline btn-sm">{{ icon('file') }} View</a>
+                            {% elif session[8] == 'planning' %}
+                                <a href="/interview/setup/{{ session[0] }}" class="btn btn-ghost btn-sm">{{ icon('edit') }} Question Setup</a>
+                                <a href="/interview/conduct/{{ session[0] }}" class="btn btn-primary btn-sm">{{ icon('play') }} Start Session</a>
+                            {% elif session[8] == 'in_progress' %}
+                                <a href="/interview/conduct/{{ session[0] }}" class="btn btn-primary btn-sm">{{ icon('play') }} Continue</a>
+                                <a href="/interview/complete/{{ session[0] }}" class="btn btn-success btn-sm">{{ icon('check') }} Finish</a>
+                            {% endif %}
+                            {% if can_manage %}
+                                <a href="/interview/delete/{{ session[0] }}" class="btn btn-danger btn-sm" data-confirm="Move this interview session to the Trash Bin?">{{ icon('trash') }}</a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">
+        <div class="empty-ico">{{ icon('mic') }}</div>
+        No active interviews to conduct.<br>
+        <a href="/interview/new" class="btn btn-primary btn-sm mt-3">{{ icon('plus') }} Start New Interview</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

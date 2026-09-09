@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Trash Bin - AI Data Information System{% endblock %}
+{% block page_title %}Trash Bin{% endblock %}
+{% block page_sub %}Deleted interviews and data records — restore them or delete them forever{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-title">🗂️ Deleted Interviews</div>
+    {% if deleted_sessions %}
+    <div class="table-wrap" style="box-shadow:none; border:1px solid var(--line);">
+        <table class="table">
+            <thead>
+                <tr><th>Title</th><th>Role</th><th>Created</th><th>Deleted</th><th>Creator</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                {% for row, can_manage in deleted_sessions %}
+                <tr>
+                    <td>{{ row[1] }}</td>
+                    <td>{{ row[2]|upper }}</td>
+                    <td>{{ row[6] or '—' }}</td>
+                    <td>{{ row[10] or '' }}</td>
+                    <td>{{ row[11] or '—' }}</td>
+                    <td>
+                        {% if can_manage %}
+                        <div class="actions">
+                            <a href="/trash/restore/session/{{ row[0] }}" class="btn btn-ghost btn-sm">♻️ Restore</a>
+                            <a href="/trash/purge/session/{{ row[0] }}" class="btn btn-danger btn-sm"
+                               onclick="return confirm('Permanently delete this interview and ALL of its responses, questions, and reports? This cannot be undone.')">🔥 Delete Forever</a>
+                        </div>
+                        {% else %}
+                        <span style="font-size:12px; color:#64748b;">🔒 Only the creator or staff can manage this</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty"><div class="big">✅</div>No deleted interviews. The trash is clean!</div>
+    {% endif %}
+</div>
+
+{% endblock %}
