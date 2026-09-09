@@ -25,7 +25,7 @@
         <svg class="t-bulb" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
         <svg class="t-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
-    <div class="auth-card">
+    <div class="auth-card auth-card-wide">
         <div class="auth-logo">
             <div class="logo-badge">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
@@ -38,37 +38,80 @@
             <div class="flash error" style="margin-bottom:16px;">{{ error }}</div>
         {% endif %}
 
-        <form method="POST">
+        <form method="POST" novalidate>
             <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" required autofocus>
-                <div class="form-hint">Choose a unique username</div>
+                <label for="full_name">Full Name <span class="required">*</span></label>
+                <input type="text" id="full_name" name="full_name" value="{{ (form and form.full_name) or '' }}"
+                       placeholder="Juan Dela Cruz" required autofocus autocomplete="name">
+                {% if errors and errors.full_name %}<div class="field-error">{{ errors.full_name }}</div>{% endif %}
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="student_id">Student ID</label>
+                    <input type="text" id="student_id" name="student_id" value="{{ (form and form.student_id) or '' }}"
+                           placeholder="2026-000123" autocomplete="off">
+                    <div class="form-hint">Required for Student accounts</div>
+                    {% if errors and errors.student_id %}<div class="field-error">{{ errors.student_id }}</div>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label for="role">Account Category <span class="required">*</span></label>
+                    <select id="role" name="role" required class="auth-category-select">
+                        <option value="">-- Select category --</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {{ 'selected' if form and form.role == cat else '' }}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors and errors.role %}<div class="field-error">{{ errors.role }}</div>{% endif %}
+                </div>
             </div>
 
             <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required>
+                <label for="email">Email <span class="required">*</span></label>
+                <input type="email" id="email" name="email" value="{{ (form and form.email) or '' }}"
+                       placeholder="juan.delacruz@gmail.com" required autocomplete="email">
+                {% if errors and errors.email %}<div class="field-error">{{ errors.email }}</div>{% endif %}
             </div>
 
             <div class="form-group">
-                <label for="role">Account Category</label>
-                <select id="role" name="role" required class="auth-category-select">
-                    <option value="">-- Select your category --</option>
-                    {% for cat in categories %}
-                    <option value="{{ cat }}">{{ cat }}</option>
-                    {% endfor %}
-                </select>
-                <div class="form-hint">Only Student and Applicant accounts can self-register. Accounts for Dean,
-                Staff, and other positions are created by the administrator.</div>
+                <label for="school">School <span class="required">*</span></label>
+                <input type="text" id="school" name="school" value="{{ (form and form.school) or '' }}"
+                       placeholder="Western Philippines University" required autocomplete="organization">
+                {% if errors and errors.school %}<div class="field-error">{{ errors.school }}</div>{% endif %}
             </div>
 
             <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" required>
-                <div class="form-hint">Use a strong password for security</div>
+                <label for="password">Password <span class="required">*</span></label>
+                <div class="pw-wrap">
+                    <input type="password" id="password" name="password" placeholder="Enter your password"
+                           required autocomplete="new-password">
+                    <button type="button" class="pw-toggle" data-target="password"
+                            aria-label="Show or hide password" title="Show / hide password">
+                        <svg class="pw-eye" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                {% if errors and errors.password %}<div class="field-error">{{ errors.password }}</div>{% endif %}
             </div>
 
-            <button type="submit" class="btn btn-primary btn-lg btn-block">Register</button>
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password <span class="required">*</span></label>
+                <div class="pw-wrap">
+                    <input type="password" id="confirm_password" name="confirm_password" placeholder="Re-enter your password"
+                           required autocomplete="new-password">
+                    <button type="button" class="pw-toggle" data-target="confirm_password"
+                            aria-label="Show or hide confirm password" title="Show / hide password">
+                        <svg class="pw-eye" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+                {% if errors and errors.confirm_password %}<div class="field-error">{{ errors.confirm_password }}</div>{% endif %}
+            </div>
+
+            <div class="flex" style="margin-bottom:16px;">
+                <input type="checkbox" id="show-password-all" style="width:auto;">
+                <label for="show-password-all" style="margin:0; font-weight:500; color:var(--muted); font-size:12.5px; cursor:pointer;">Show Password</label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg btn-block">Create Account</button>
         </form>
 
         <div class="auth-alt">Already have an account? <a href="/login">Login here</a></div>
@@ -81,6 +124,28 @@
             root.setAttribute("data-theme", next);
             try { localStorage.setItem("aisiap-theme", next); } catch (e) {}
         }
+
+        (function () {
+            /* Per-field eye icon: show/hide one password input */
+            document.querySelectorAll('.pw-toggle').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var field = document.getElementById(btn.getAttribute('data-target'));
+                    if (!field) return;
+                    field.type = field.type === 'password' ? 'text' : 'password';
+                });
+            });
+            /* "Show Password" checkbox: toggles BOTH password fields */
+            var showAll = document.getElementById('show-password-all');
+            if (showAll) {
+                showAll.addEventListener('change', function () {
+                    var type = showAll.checked ? 'text' : 'password';
+                    ['password', 'confirm_password'].forEach(function (id) {
+                        var f = document.getElementById(id);
+                        if (f) f.type = type;
+                    });
+                });
+            }
+        })();
     </script>
 </body>
 </html>

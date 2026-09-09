@@ -36,13 +36,21 @@ USER_CATEGORIES = [
     "Department Head/Program Chair",
     "Staff Employee",
     "Guidance Counselor",
+    "Staff",
+    "Instructor",
+    "Owner/Admin",
 ]
 
 # Display normalization for legacy stakeholder values stored before categories existed
 CATEGORY_DISPLAY_MAP = {
     "student": "Student",
-    "instructor": "Faculty",
+    "instructor": "Instructor",
     "": "Unspecified",
+    "staff": "Staff",
+    "owner": "Owner/Admin",
+    "owner/admin": "Owner/Admin",
+    "admin": "Owner/Admin",
+    "administrator": "Owner/Admin",
     None: "Unspecified",
 }
 
@@ -57,12 +65,22 @@ PRIVILEGED_CATEGORIES = {
     "Staff Employee",
     "Department Head/Program Chair",
     "Guidance Counselor",
+    "Staff",
+    "Instructor",
+    "Owner/Admin",
 }
 
 # Categories that may self-register on the public Register page. Accounts for
 # Dean, Faculty, Staff and other positions are created by an administrator in
 # Manage Accounts (/accounts) so nobody can promote themselves.
-REGISTRATION_CATEGORIES = ["Student", "Applicant"]
+REGISTRATION_CATEGORIES = ["Student", "Applicant", "Staff", "Instructor"]
+
+# Owner/Admin bootstrap (env-configurable, never exposed to frontend).
+# Set OWNER_USERNAME / OWNER_PASSWORD env vars to override defaults.
+OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "Dan")
+OWNER_PASSWORD = os.environ.get("OWNER_PASSWORD", "10231998")
+OWNER_ROLE = "Owner/Admin"
+
 
 # Expose to all templates (used for nav visibility of Manage Accounts)
 app.jinja_env.globals['PRIVILEGED_CATEGORIES'] = PRIVILEGED_CATEGORIES
@@ -416,6 +434,58 @@ def init_db():
     except sqlite3.OperationalError:
         pass  # Column already exists
 
+    # Migration: registration profile fields (Full Name / Student ID / School)
+    for _ddl, _label in [
+        ("ALTER TABLE users ADD COLUMN full_name TEXT", "full_name"),
+        ("ALTER TABLE users ADD COLUMN student_id TEXT", "student_id"),
+        ("ALTER TABLE users ADD COLUMN school TEXT", "school"),
+    ]:
+        try:
+            cursor.execute(_ddl)
+            logger.info(f"Migration applied: added {_label} column to users")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+    # Backfill: existing username becomes the display Full Name when empty.
+    try:
+        cursor.execute("UPDATE users SET full_name = username WHERE full_name IS NULL OR TRIM(full_name) = ''")
+    except sqlite3.OperationalError:
+        pass
+
+    # Owner/Admin bootstrap — ensures the system owner account exists. The
+    # password is stored only as a hash (env-configurable via OWNER_USERNAME /
+    # OWNER_PASSWORD) and is never exposed to the frontend or templates.
+    try:
+        owner = cursor.execute(
+            "SELECT id, password, role FROM users WHERE LOWER(username) = LOWER(?)",
+            (OWNER_USERNAME,),
+        ).fetchone()
+        if not owner:
+            cursor.execute(
+                """
+                INSERT INTO users (username, password, email, role, full_name, school)
+                VALUES (?, ?, '', ?, ?, 'System Administration')
+                """,
+                (OWNER_USERNAME, hash_password(OWNER_PASSWORD), OWNER_ROLE, OWNER_USERNAME),
+            )
+            owner_id = cursor.lastrowid
+            account_code = next_code(conn, "users", "account_code", "ACC")
+            cursor.execute("UPDATE users SET account_code = ? WHERE id = ?", (account_code, owner_id))
+            logger.info(f"Owner/Admin bootstrap: created owner account '{OWNER_USERNAME}'")
+        else:
+            owner_id, owner_pw, owner_role = owner
+            updates = {}
+            if not verify_password(OWNER_PASSWORD, owner_pw or ""):
+                updates["password"] = hash_password(OWNER_PASSWORD)
+            if (owner_role or "") != OWNER_ROLE:
+                updates["role"] = OWNER_ROLE
+            if updates:
+                sets = ", ".join(f"{k} = ?" for k in updates)
+                cursor.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), owner_id))
+                logger.info(f"Owner/Admin bootstrap: repaired owner account '{OWNER_USERNAME}'")
+    except sqlite3.Error as exc:
+        logger.warning(f"Owner/Admin bootstrap skipped: {exc}")
+
     conn.commit()
     conn.close()
     logger.info("Database initialization completed successfully")
@@ -598,8 +668,9 @@ def login():
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id, password, role, username FROM users WHERE LOWER(username) = LOWER(?)",
-            (username,)
+            "SELECT id, password, role, username FROM users "
+            "WHERE LOWER(username) = LOWER(?) OR (email IS NOT NULL AND email != '' AND LOWER(email) = LOWER(?))",
+            (username, username)
         )
         user = cursor.fetchone()
         
@@ -648,9 +719,9 @@ def login():
                     logger.warning(f"Legacy account '{canonical_username}' tried to self-assign staff category '{chosen_role}'")
                     return render_template(
                         "login.html",
-                        error=("Staff/office categories (Dean, Faculty, Staff, Department Head, "
-                               "Guidance Counselor) can only be assigned by an administrator. "
-                               "Please login as Student or Applicant."),
+                        error=("Staff/office categories (Dean, Faculty, Staff, Instructor, "
+                               "Department Head, Guidance Counselor) can only be assigned by an "
+                               "administrator. Please login as Student or Applicant."),
                         categories=USER_CATEGORIES
                     )
                 stored_role = chosen_role
@@ -719,53 +790,65 @@ def login():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "")
+        full_name = request.form.get("full_name", "").strip()
+        student_id = request.form.get("student_id", "").strip()
         email = request.form.get("email", "").strip()
+        school = request.form.get("school", "").strip()
         role = request.form.get("role", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
 
-        # Public registration is limited to non-staff categories. Accounts for
-        # Dean, Faculty, Staff and other positions are created by an admin in
-        # Manage Accounts so nobody can promote themselves.
+        # Backward compatibility: older clients/tests may still post 'username'
+        if not full_name:
+            full_name = request.form.get("username", "").strip()
+
+        # ---- Field-level validation (errors shown beside each field) ----
+        errors = {}
+        if not full_name:
+            errors["full_name"] = "Full Name is required."
         if role not in REGISTRATION_CATEGORIES:
-            return render_template(
-                "register.html",
-                error=("Only Student and Applicant accounts can self-register. Accounts for "
-                       "Dean, Faculty, Staff and other positions are created by an administrator."),
-                categories=REGISTRATION_CATEGORIES)
+            errors["role"] = ("Please choose a valid account category "
+                              "(Student, Applicant, Staff, or Instructor).")
+        if role == "Student" and not student_id:
+            errors["student_id"] = "Student ID is required for Student accounts."
+        if not email or "@" not in email or "." not in email.split("@")[-1] or " " in email:
+            errors["email"] = "Please enter a valid email address (e.g., juan.delacruz@gmail.com)."
+        if not school:
+            errors["school"] = "School is required."
+        if not password:
+            errors["password"] = "Password is required."
+        elif len(password) < 6:
+            errors["password"] = "Password must be at least 6 characters."
+        if password and confirm_password != password:
+            errors["confirm_password"] = "Passwords do not match."
 
-        if not username or not password:
-            return render_template("register.html",
-                                   error="Username and password are required.",
+        form = {"full_name": full_name, "student_id": student_id,
+                "email": email, "school": school, "role": role}
+        if errors:
+            return render_template("register.html", errors=errors, form=form,
                                    categories=REGISTRATION_CATEGORIES)
 
-        logger.info(f"Registration attempt for user '{username}' (category: {role})")
-        
+        # The login username is derived from the Full Name; a numeric suffix is
+        # appended automatically when the name is already taken.
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
-        
         try:
-            # Case-insensitive username check (so 'Dan' and 'dan' are the same name)
-            existing = cursor.execute(
-                "SELECT username FROM users WHERE LOWER(username) = LOWER(?)", (username,)
-            ).fetchone()
-            if existing:
-                conn.close()
-                logger.warning(f"Registration failed - username '{username}' already taken (as '{existing[0]}')")
-                return render_template(
-                    "register.html",
-                    error=(f"The username '{username}' is already taken"
-                           + (f" (registered as '{existing[0]}')" if existing[0] != username else "")
-                           + ". Please choose a different username."),
-                    categories=REGISTRATION_CATEGORIES)
+            base_username = full_name
+            username = base_username
+            suffix = 2
+            while cursor.execute(
+                "SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)", (username,)
+            ).fetchone():
+                username = f"{base_username} {suffix}"
+                suffix += 1
 
             hashed_password = hash_password(password)
             cursor.execute(
                 """
-                INSERT INTO users (username, password, email, role)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO users (username, password, email, role, full_name, student_id, school)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (username, hashed_password, email, role)
+                (username, hashed_password, email, role, full_name, student_id, school)
             )
             new_user_id = cursor.lastrowid
             if new_user_id:
@@ -773,16 +856,18 @@ def register():
                 conn.execute("UPDATE users SET account_code = ? WHERE id = ?", (account_code, new_user_id))
             conn.commit()
             conn.close()
-            
-            logger.info(f"New user '{username}' registered successfully")
+
+            logger.info(f"New user '{username}' registered successfully (category: {role})")
             return redirect("/login")
         except sqlite3.IntegrityError:
             conn.close()
-            logger.warning(f"Registration failed - username '{username}' already exists")
-            return render_template("register.html",
-                                   error="That username is already taken. Please choose a different one.",
-                                   categories=REGISTRATION_CATEGORIES)
-    
+            logger.warning("Registration failed - account already exists")
+            return render_template(
+                "register.html",
+                errors={"full_name": "An account with this Full Name already exists. Try adding your middle name."},
+                form=form,
+                categories=REGISTRATION_CATEGORIES)
+
     return render_template("register.html", categories=REGISTRATION_CATEGORIES)
 
 

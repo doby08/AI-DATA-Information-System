@@ -977,3 +977,77 @@ html[data-theme] .topbar h1 { transition: color .22s ease; }
 [data-theme="light"] .auth-card { box-shadow: 0 18px 46px rgba(15, 23, 42, .16); }
 
 /*__END__*/
+/*__END__*/
+
+/* ============================================================
+   MOBILE RESPONSIVE + REGISTRATION/LOGIN IMPROVEMENTS
+   (appended — desktop layout untouched)
+   ============================================================ */
+
+/* ---- Password inputs with eye toggle ---- */
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 46px; }
+.pw-toggle {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; color: var(--muted);
+    padding: 6px; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; line-height: 0;
+}
+.pw-toggle:hover, .pw-toggle:focus { color: var(--ink); }
+.pw-toggle svg { width: 18px; height: 18px; }
+
+/* ---- Inline field validation errors ---- */
+.field-error {
+    display: flex; align-items: flex-start; gap: 6px;
+    color: #f87171; font-size: 12px; font-weight: 600;
+    margin-top: 6px; line-height: 1.4;
+}
+.field-error::before { content: "⚠"; flex: none; }
+[data-theme="light"] .field-error { color: #b91c1c; }
+
+/* ---- Wider auth card for the longer registration form ---- */
+@media (min-width: 560px) {
+    .auth-card.auth-card-wide { max-width: 560px; }
+}
+
+/* ---- Global mobile safety net: nothing may overflow the viewport ---- */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, svg, video, canvas, iframe { max-width: 100%; }
+.btn { white-space: normal; word-break: break-word; }
+.topbar { flex-wrap: wrap; }
+.topbar > div { min-width: 0; }
+
+/* ---- Tables scroll horizontally inside their container on small screens ---- */
+@media (max-width: 768px) {
+    body { font-size: 14px; }
+    .table-wrap {
+        overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 12px;
+    }
+    .table-wrap .table { min-width: 620px; }
+    .table thead th, .table tbody td { padding: 11px 12px; font-size: 12.5px; }
+    .actions { flex-wrap: wrap; gap: 6px; }
+    .actions .btn { width: auto; }
+    .grid { gap: 16px; }
+    .card { padding: 18px 16px; }
+    .hero { padding: 26px 22px; }
+    .search-box, .filters { max-width: 100%; }
+    .user-dropdown, .notif-panel { max-width: calc(100vw - 32px); }
+    .qa-loader-card { margin: 0 16px; }
+    .toast-host { left: 16px; right: 16px; }
+    .toast { max-width: 100%; }
+}
+@media (max-width: 480px) {
+    .main { padding: 14px 14px 50px; }
+    .card { padding: 16px 13px; border-radius: 12px; }
+    .card-title { font-size: 13px; }
+    .kpi { padding: 16px 14px 13px; }
+    .kpi-num { font-size: 28px; }
+    .btn { padding: 10px 14px; font-size: 13px; }
+    .btn-sm { padding: 7px 10px; font-size: 11.5px; }
+    .auth-card { padding: 26px 18px 22px; border-radius: 16px; }
+    .auth-body { padding: 14px; }
+    .topbar h1 { font-size: 17px; }
+    .table thead th, .table tbody td { padding: 10px 10px; font-size: 12px; }
+    .info-note, .warn-note { font-size: 12.5px; padding: 11px 12px; }
+    .form-row { grid-template-columns: 1fr; gap: 0; }
+}
