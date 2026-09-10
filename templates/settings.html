@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Settings — A.I.S.I.A.P.{% endblock %}
 {% block page_title %}Settings{% endblock %}
-{% block page_sub %}Manage your profile, interview defaults, AI analysis, and data{% endblock %}
+{% block page_sub %}Manage your profile, AI analysis, and data{% endblock %}
 {% block content %}
 {% from "_icons.html" import icon with context %}
 
@@ -68,28 +68,6 @@
                 <input type="password" name="confirm_password" required>
             </div>
             <button type="submit" class="btn btn-warning">{{ icon('lock') }} Change Password</button>
-        </form>
-    </div>
-
-    <!-- INTERVIEW DEFAULTS -->
-    <div class="card">
-        <div class="card-title"><span>{{ icon('target') }} Interview Defaults</span></div>
-        <form method="POST">
-            <input type="hidden" name="form_type" value="defaults">
-            <div class="form-group">
-                <label>Default Verifier / Interviewer Name</label>
-                <input type="text" name="verifier_name" value="{{ defaults.verifier_name }}" placeholder="e.g., Juan Dela Cruz">
-            </div>
-            <div class="form-group">
-                <label>Default Verifier Role</label>
-                <input type="text" name="verifier_role" value="{{ defaults.verifier_role }}" placeholder="e.g., Research Assistant">
-            </div>
-            <div class="form-group">
-                <label>Default Number of AI Questions</label>
-                <input type="number" name="question_count" min="1" max="20" value="{{ defaults.question_count }}">
-            </div>
-            <button type="submit" class="btn btn-primary">{{ icon('save') }} Save Defaults</button>
-            <p class="form-hint">Used when creating a new interview.</p>
         </form>
     </div>
 

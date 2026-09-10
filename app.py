@@ -1401,11 +1401,9 @@ def new_interview():
         # Send the admin straight to AI Question Setup to review the generated set.
         return redirect(f"/interview/setup/{session_id}")
     
-    # Pre-fill defaults saved in Settings
-    defaults = {
-        'num_questions': get_setting(user_id, "default_question_count", "5"),
-    }
-    return render_template("interview_new.html", defaults=defaults, active='setup')
+    # Pre-fill default question count saved in Settings
+    default_q = get_setting(user_id, "default_question_count", "5")
+    return render_template("interview_new.html", defaults={'num_questions': default_q}, active='setup')
 
 
 # ============ AI QUESTION SETUP ============
@@ -2714,11 +2712,6 @@ def settings_page():
             flash(f"Gemini AI settings saved for the WHOLE system! Gemini is now {state} for all accounts.", "success")
             return redirect(url_for('settings_page'))
     
-    defaults = {
-        'verifier_name': get_setting(user_id, "default_verifier_name", ""),
-        'verifier_role': get_setting(user_id, "default_verifier_role", username),
-        'question_count': get_setting(user_id, "default_question_count", "5"),
-    }
     ai = {
         'pain_keywords': get_setting(user_id, "ai_pain_keywords",
                                      "difficult, challenge, frustrat, problem, issue, slow, manual"),
@@ -2737,7 +2730,7 @@ def settings_page():
     }
     
     return render_template("settings.html", user=user, login_history=login_history,
-                           defaults=defaults, ai=ai, ai_api=ai_api, active='settings',
+                           ai=ai, ai_api=ai_api, active='settings',
                            is_admin=is_privileged_user())
 
 
