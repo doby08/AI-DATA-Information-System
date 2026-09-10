@@ -15,6 +15,7 @@ import tempfile
 from functools import wraps
 import hashlib
 import time
+import threading
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your_secret_key_here')  # Set SECRET_KEY env var in production
@@ -1696,6 +1697,41 @@ def conduct_interview(session_id):
                            questions=questions, is_privileged=is_privileged_user(), active='sessions')
 
 
+def _keyword_key_points(response_text, user_id):
+    """Instant, offline key-point extraction (no AI call — milliseconds)."""
+    pain_words = parse_keywords(get_setting(user_id, "ai_pain_keywords", ""))
+    feature_words = parse_keywords(get_setting(user_id, "ai_feature_keywords", ""))
+    workflow_words = parse_keywords(get_setting(user_id, "ai_workflow_keywords", ""))
+    return analyze_responses([response_text],
+                             pain_indicators=pain_words or None,
+                             feature_indicators=feature_words or None,
+                             workflow_indicators=workflow_words or None)
+
+
+def _reanalyze_key_points_background(response_id, response_text, user_id):
+    """Re-run the AI (Gemini) key-point analysis in a background thread.
+
+    Saving/editing a response must feel instant, so the caller stores
+    keyword-based points immediately and this thread quietly upgrades them
+    with AI-generated points a few seconds later. Failures are logged and
+    never affect the user."""
+    def _work():
+        try:
+            key_points = analyze_responses([response_text],
+                                           gemini_cfg=build_gemini_cfg(user_id))
+            conn = sqlite3.connect(DATABASE)
+            conn.execute(
+                "UPDATE interview_responses SET key_points = ? WHERE id = ?",
+                (json.dumps(key_points), response_id)
+            )
+            conn.commit()
+            conn.close()
+            logger.info(f"Background AI key points saved for response {response_id}")
+        except Exception as exc:
+            logger.warning(f"Background key-point analysis skipped for response {response_id}: {exc}")
+    threading.Thread(target=_work, daemon=True, name=f"keypoints-{response_id}").start()
+
+
 @app.route("/api/save-response", methods=["POST"])
 @login_required
 def save_response():
@@ -1718,7 +1754,7 @@ def save_response():
         return jsonify({"status": "error",
                         "message": "Only the creator of this interview can record responses."}), 403
 
-    conn.execute(
+    cursor = conn.execute(
         """
         INSERT INTO interview_responses (session_id, question_id, response_text, transcription, respondent_name, response_duration)
         VALUES (?, ?, ?, ?, ?, ?)
@@ -1726,24 +1762,20 @@ def save_response():
         (session_id, question_id, response_text, response_text, respondent_name, response_duration)
     )
     conn.commit()
+    response_id = cursor.lastrowid
     
-    # Extract key points from response (using custom AI keywords from Settings)
+    # Instant keyword-based key points (no AI wait), then upgrade with AI
+    # quietly in the background so the interviewer moves on immediately.
     user_id = session.get('user_id')
-    pain_words = parse_keywords(get_setting(user_id, "ai_pain_keywords", ""))
-    feature_words = parse_keywords(get_setting(user_id, "ai_feature_keywords", ""))
-    workflow_words = parse_keywords(get_setting(user_id, "ai_workflow_keywords", ""))
-    key_points = analyze_responses([response_text],
-                                   pain_indicators=pain_words or None,
-                                   feature_indicators=feature_words or None,
-                                   workflow_indicators=workflow_words or None,
-                                   gemini_cfg=build_gemini_cfg(user_id))
-    
+    key_points = _keyword_key_points(response_text, user_id)
     conn.execute(
-        "UPDATE interview_responses SET key_points = ? WHERE session_id = ? AND question_id = ?",
-        (json.dumps(key_points), session_id, question_id)
+        "UPDATE interview_responses SET key_points = ? WHERE id = ?",
+        (json.dumps(key_points), response_id)
     )
     conn.commit()
     conn.close()
+    
+    _reanalyze_key_points_background(response_id, response_text, user_id)
     
     logger.info(f"Response saved successfully for session {session_id}, question {question_id}")
     return jsonify({"status": "success", "key_points": key_points})
@@ -1806,16 +1838,10 @@ def edit_response():
         (response_text, response_text, response_id)
     )
     
-    # Re-analyze key points
+    # Instant keyword-based key points (no AI wait), then upgrade with AI
+    # quietly in the background so editing feels immediate.
     user_id = session.get('user_id')
-    pain_words = parse_keywords(get_setting(user_id, "ai_pain_keywords", ""))
-    feature_words = parse_keywords(get_setting(user_id, "ai_feature_keywords", ""))
-    workflow_words = parse_keywords(get_setting(user_id, "ai_workflow_keywords", ""))
-    key_points = analyze_responses([response_text],
-                                   pain_indicators=pain_words or None,
-                                   feature_indicators=feature_words or None,
-                                   workflow_indicators=workflow_words or None,
-                                   gemini_cfg=build_gemini_cfg(user_id))
+    key_points = _keyword_key_points(response_text, user_id)
     
     conn.execute(
         "UPDATE interview_responses SET key_points = ? WHERE id = ?",
@@ -1824,6 +1850,8 @@ def edit_response():
     
     conn.commit()
     conn.close()
+    
+    _reanalyze_key_points_background(response_id, response_text, user_id)
     
     logger.info(f"Response {response_index} updated successfully for session {session_id}")
     return jsonify({"status": "success", "key_points": key_points})
