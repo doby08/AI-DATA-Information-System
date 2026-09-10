@@ -2,21 +2,40 @@
 AI Service Module for Interview System
 Handles question generation, response analysis, and report generation
 
-Optional Gemini AI upgrade (see gemini_ai.py): when the user has enabled and
-configured a Gemini API key in Settings, the functions below use real AI
-generation. If Gemini is disabled, unconfigured, offline, or errors out,
+Optional AI upgrade (see gemini_ai.py for Gemini and ollama_ai.py for Ollama):
+when the user has enabled and configured an AI provider in Settings, the
+functions below use real AI generation.  Gemini is tried first; if it is
+unavailable, Ollama (local model) is tried next; if both are unavailable,
 every function transparently falls back to the built-in rule-based logic
 so the system keeps working.
 """
 
 import logging
+import os
 
 # Optional Gemini upgrade layer (same project folder). The system works
-# without it — all functions fall back to the rule-based logic below.
+# without it -- all functions fall back to the rule-based logic below.
 try:
     import gemini_ai
 except ImportError:  # pragma: no cover
     gemini_ai = None
+
+# Optional Ollama AI layer (local model, no API key needed).
+# Works with EITHER:
+#   1. The `ollama` PyPI package  (pip install ollama) + `ollama serve`, or
+#   2. Plain REST via urllib (no extra install) -- ollama_ai.py handles both.
+try:
+    import ollama_ai
+except ImportError:  # pragma: no cover
+    ollama_ai = None
+
+# Optional `ollama` PyPI client (user installed it: "nag install ako ng ollama").
+# Imported lazily/optionally -- the app NEVER breaks when it is missing because
+# ollama_ai.py also speaks raw REST via urllib.
+try:
+    import ollama as ollama_pkg  # type: ignore
+except ImportError:  # pragma: no cover
+    ollama_pkg = None
 
 logger = logging.getLogger(__name__)
 
@@ -255,17 +274,29 @@ def generate_interview_questions(system_type: str, user_role: str, max_questions
     
     Returns:
         List of question dictionaries with 'text' and 'category' keys
-    """
+        """
     
     # Gemini AI upgrade: generate questions with real AI when configured
-    if _ai_enabled(gemini_cfg):
-        ai_questions = _gemini_questions(system_type, user_role, max_questions, gemini_cfg,
+    if _gemini_enabled(gemini_cfg):
+        gem_cfg, _ = _normalize_ai_cfg(gemini_cfg)
+        ai_questions = _gemini_questions(system_type, user_role, max_questions, gem_cfg,
                                          extra_context=extra_context)
         if ai_questions:
             logger.info("Gemini generated %d interview questions (system=%s, role=%s)",
                         len(ai_questions), system_type, user_role)
             return ai_questions
         logger.info("Gemini question generation unavailable; using built-in templates")
+
+    # Ollama AI alternative: local model, no API key required
+    if _ollama_enabled(gemini_cfg):
+        _, oll_cfg = _normalize_ai_cfg(gemini_cfg)
+        ai_questions = _ollama_questions(system_type, user_role, max_questions, oll_cfg,
+                                         extra_context=extra_context)
+        if ai_questions:
+            logger.info("Ollama generated %d interview questions (system=%s, role=%s)",
+                        len(ai_questions), system_type, user_role)
+            return ai_questions
+        logger.info("Ollama question generation unavailable; using built-in templates")
     
     # Normalize inputs
     system_type = system_type.lower().replace(" ", "_")
@@ -367,12 +398,21 @@ def analyze_responses(responses: list,
         List of key points extracted from responses
     """
     
-    # Gemini AI upgrade: extract key points with real AI when configured
-    if _ai_enabled(gemini_cfg) and responses:
-        ai_points = _gemini_key_points(responses, gemini_cfg)
+            # Gemini AI upgrade: extract key points with real AI when configured
+    if _gemini_enabled(gemini_cfg) and responses:
+        gem_cfg, _ = _normalize_ai_cfg(gemini_cfg)
+        ai_points = _gemini_key_points(responses, gem_cfg)
         if ai_points:
             return ai_points
         logger.info("Gemini key-point extraction unavailable; using keyword matching")
+
+    # Ollama AI alternative: local model, no API key required
+    if _ollama_enabled(gemini_cfg) and responses:
+        _, oll_cfg = _normalize_ai_cfg(gemini_cfg)
+        ai_points = _ollama_key_points(responses, oll_cfg)
+        if ai_points:
+            return ai_points
+        logger.info("Ollama key-point extraction unavailable; using keyword matching")
     
     key_points = []
     
@@ -592,6 +632,16 @@ def generate_recommendations(pain_points: list,
             return ai_recs
         logger.info("Gemini recommendations unavailable; using rule-based engine")
 
+    # Ollama AI alternative: local model, no API key required
+    if _ollama_enabled(gemini_cfg):
+        _, oll_cfg = _normalize_ai_cfg(gemini_cfg)
+        ai_recs = _ollama_recommendations(pain_points, desired_features,
+                                          recurring_issues, user_role, oll_cfg)
+        if ai_recs:
+            logger.info("Ollama generated %d recommendations", len(ai_recs))
+            return ai_recs
+        logger.info("Ollama recommendations unavailable; using rule-based engine")
+
     recommendations = []
     seen = set()
 
@@ -681,6 +731,15 @@ def generate_summary(responses: list, gemini_cfg: dict = None) -> dict:
             logger.info("Gemini generated interview summary (%d responses)", len(responses))
             return ai_summary
         logger.info("Gemini summary unavailable; using rule-based analysis")
+
+    # Ollama AI alternative: local model, no API key required
+    if _ollama_enabled(gemini_cfg) and responses:
+        _, oll_cfg = _normalize_ai_cfg(gemini_cfg)
+        ai_summary = _ollama_summary(responses, oll_cfg)
+        if ai_summary:
+            logger.info("Ollama generated interview summary (%d responses)", len(responses))
+            return ai_summary
+        logger.info("Ollama summary unavailable; using rule-based analysis")
     
     if not responses:
         return {
@@ -789,6 +848,39 @@ def _ai_enabled(gemini_cfg) -> bool:
     if not gemini_cfg.get("enabled") or not gemini_cfg.get("api_key"):
         return False
     return gemini_ai.is_available()
+
+
+def _normalize_ai_cfg(cfg) -> tuple:
+    """
+    Split a combined AI config into (gemini_cfg, ollama_cfg).
+
+    app.py's build_gemini_cfg() returns the Gemini config dict and attaches
+    the Ollama config under the optional "ollama" key, e.g.::
+
+        {"enabled": True, "api_key": "...", "model": "...", "source": "...",
+         "ollama": {"enabled": False, "url": "...", "model": "..."}}
+
+    Returns a tuple so callers can route each provider to its own helpers.
+    """
+    cfg = cfg if isinstance(cfg, dict) else {}
+    oll_cfg = cfg.get("ollama")
+    gem_cfg = {k: v for k, v in cfg.items() if k != "ollama"}
+    return gem_cfg, (oll_cfg if isinstance(oll_cfg, dict) else {})
+
+
+def _gemini_enabled(cfg) -> bool:
+    """True when the Gemini part of the combined AI config is active."""
+    gem_cfg, _ = _normalize_ai_cfg(cfg)
+    return _ai_enabled(gem_cfg)
+
+
+def _ollama_enabled(cfg) -> bool:
+    """True when the Ollama part of the combined AI config is active."""
+    _, oll_cfg = _normalize_ai_cfg(cfg)
+    if ollama_ai is None or not oll_cfg.get("enabled"):
+        return False
+    return ollama_ai.is_available()
+
 
 
 def _numbered_texts(responses: list) -> str:
@@ -980,3 +1072,230 @@ Respond with ONLY a JSON array, no extra text, exactly in this format:
     except Exception as exc:
         logger.warning("Gemini recommendations error: %s", exc)
         return None
+
+
+# ============ OLLAMA AI LAYER (LOCAL MODEL, NO API KEY) ============
+# When an Ollama server (e.g. http://localhost:11434) is configured in
+# Settings, these helpers generate the same AI results using a LOCAL model.
+# They are tried after Gemini and always return None on any problem so the
+# caller falls back to the rule-based logic — nothing ever breaks.
+
+def _ollama_call(prompt: str, oll_cfg: dict, json_mode: bool = True,
+                 max_output_tokens: int = None):
+    """Send a prompt through ollama_ai.call_ollama. Returns text or raises."""
+    tokens = max_output_tokens or ollama_ai.MAX_OUTPUT_TOKENS
+    return ollama_ai.call_ollama(
+        prompt,
+        url=oll_cfg.get("url"),
+        model=oll_cfg.get("model"),
+        json_mode=json_mode,
+        max_output_tokens=tokens,
+    )
+
+
+def _clean_question_list(data, max_questions: int = None):
+    """Validate/normalize an AI question list. Returns list of dicts or None.
+
+    Tolerant of small local models: accepts a single question object when an
+    array was requested, and coerces plain strings into question dicts.
+    """
+    if isinstance(data, dict):
+        data = [data]
+    if not isinstance(data, list):
+        return None
+    questions = []
+    for item in data:
+        if isinstance(item, str) and item.strip():
+            item = {"text": item.strip()}
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text", "")).strip()
+        if not text:
+            continue
+        category = str(item.get("category", "context")).strip().lower().replace(" ", "_")
+        if category not in ALLOWED_QUESTION_CATEGORIES:
+            category = "context"
+        questions.append({"text": text, "category": category})
+    if max_questions and max_questions > 0:
+        questions = questions[:max_questions]
+    return questions or None
+
+
+
+def _ollama_questions(system_type: str, user_role: str, max_questions: int,
+                      oll_cfg: dict, extra_context: str = None):
+    """AI-generate interview questions via a local Ollama model. Returns list of dicts or None."""
+    if ollama_ai is None:
+        return None
+    try:
+        tokens_needed = max(1024, (max_questions or 5) * 256)
+        context_line = ""
+        if extra_context:
+            context_line = f"\nInterview context: {str(extra_context).strip()}\n"
+        prompt = f"""You are preparing questions for a requirements-elicitation interview about a {system_type.replace('_', ' ')}.
+The interviewee category is: {user_role}.{context_line}
+Generate exactly {max_questions or 5} open-ended interview questions covering goals, challenges, workflows, and desired features.
+
+Respond with ONLY a JSON array, no extra text, in this exact format:
+[{{"text": "Question text here?", "category": "pain_points"}}]"""
+        raw = _ollama_call(prompt, oll_cfg, json_mode=True, max_output_tokens=tokens_needed)
+        data = ollama_ai.parse_json_block(raw)
+        return _clean_question_list(data, max_questions)
+    except Exception as exc:
+        logger.warning("Ollama question generation error: %s", exc)
+        return None
+
+
+def _ollama_key_points(responses: list, oll_cfg: dict):
+    """AI-extract concise key points via a local Ollama model. Returns list of strings or None."""
+    if ollama_ai is None:
+        return None
+    try:
+        prompt = f"""You are analyzing interview responses about a system.
+
+Responses:
+{_numbered_texts(responses)}
+
+Extract the most important key points. Each key point must be one short concise phrase (maximum 12 words) describing a pain point, desired feature, workflow detail, or notable insight.
+
+Respond with ONLY a JSON array of strings, no extra text:
+["key point one", "key point two"]"""
+        raw = _ollama_call(prompt, oll_cfg, json_mode=True)
+        data = ollama_ai.parse_json_block(raw)
+        # Tolerate small local models: they may return a single string, a
+        # plain object, or {"key_points": [...]} instead of a string array.
+        if isinstance(data, str):
+            data = [data]
+        if isinstance(data, dict):
+            for value in data.values():
+                if isinstance(value, list):
+                    data = value
+                    break
+            else:
+                data = [str(v).strip() for v in data.values() if str(v).strip()]
+        if not isinstance(data, list):
+            return None
+        points = [str(point).strip() for point in data if str(point).strip()]
+        return points or None
+    except Exception as exc:
+        logger.warning("Ollama key-point extraction error: %s", exc)
+        return None
+
+
+def _ollama_summary(responses: list, oll_cfg: dict):
+    """AI-generate the full interview analysis via a local Ollama model. Returns the standard summary dict or None."""
+    if ollama_ai is None:
+        return None
+    try:
+        prompt = f"""You are a systems analyst summarizing stakeholder interview responses.
+
+Responses:
+{_numbered_texts(responses)}
+
+Produce an analysis with:
+- "summary": a well-written multi-paragraph plain-text report describing the overall findings, written for decision-makers.
+- "pain_points": list of short phrases (max 12 words each) describing problems users face
+- "desired_features": list of short phrases describing improvements or features users want
+- "recurring_issues": list of short phrases describing problems that repeat across responses
+- "suggested_solutions": list of objects {{"source": "Pain Point" or "Recurring Issue" or "Requested Feature", "issue": "<matching issue text from above>", "solution": "1-2 sentence concrete, actionable solution"}}
+
+Respond with ONLY a JSON object, no extra text, exactly in this format:
+{{"summary": "...", "pain_points": ["..."], "desired_features": ["..."], "recurring_issues": ["..."], "suggested_solutions": [{{"source": "Pain Point", "issue": "...", "solution": "..."}}]}}"""
+        raw = _ollama_call(prompt, oll_cfg, json_mode=True, max_output_tokens=3072)
+        data = ollama_ai.parse_json_block(raw)
+        if not isinstance(data, dict):
+            return None
+
+        solutions = []
+        for item in (data.get("suggested_solutions") or []):
+            if not isinstance(item, dict):
+                continue
+            issue = str(item.get("issue", "")).strip()
+            solution = str(item.get("solution", "")).strip()
+            source = str(item.get("source", "Pain Point")).strip() or "Pain Point"
+            if issue and solution:
+                solutions.append({"source": source, "issue": issue, "solution": solution})
+
+        summary_text = str(data.get("summary", "")).strip()
+        if not summary_text:
+            return None
+
+        def clean_str_list(value):
+            if not isinstance(value, list):
+                return []
+            return [str(item).strip() for item in value if str(item).strip()]
+
+        return {
+            "summary": summary_text,
+            "pain_points": clean_str_list(data.get("pain_points")),
+            "desired_features": clean_str_list(data.get("desired_features")),
+            "recurring_issues": clean_str_list(data.get("recurring_issues")),
+            "suggested_solutions": solutions,
+        }
+    except Exception as exc:
+        logger.warning("Ollama summary error: %s", exc)
+        return None
+
+
+def _ollama_recommendations(pain_points: list, desired_features: list,
+                            recurring_issues: list, user_role: str, oll_cfg: dict):
+    """AI-generate prioritized recommendations via a local Ollama model. Returns list of {title, action, priority, based_on} or None."""
+    if ollama_ai is None:
+        return None
+    try:
+        findings = (
+            [f"Pain point: {p}" for p in (pain_points or []) if p] +
+            [f"Requested feature: {f}" for f in (desired_features or []) if f] +
+            [f"Recurring issue: {r}" for r in (recurring_issues or []) if r]
+        )
+        if not findings:
+            return None
+        numbered = "\n".join(f"- {f}" for f in findings)
+        role_line = f"\nThe interviewed stakeholder category is: {user_role}.\n" if user_role else ""
+        prompt = f"""You are an IT consultant turning stakeholder interview findings into prioritized recommendations.
+
+Findings:
+{numbered}
+{role_line}
+For each distinct finding (merge duplicates), give ONE actionable recommendation. Each recommendation needs:
+- "title": short title of the action (e.g. "Automate the Slow Process")
+- "action": 1-2 sentence concrete next step the organization should take
+- "priority": exactly one of "High", "Medium", "Low"
+- "based_on": the finding text this recommendation came from
+
+Respond with ONLY a JSON array, no extra text, exactly in this format:
+[{{"title": "...", "action": "...", "priority": "High", "based_on": "..."}}]"""
+        raw = _ollama_call(prompt, oll_cfg, json_mode=True, max_output_tokens=3072)
+        data = ollama_ai.parse_json_block(raw)
+        if not isinstance(data, list) or not data:
+            return None
+
+        recommendations = []
+        seen = set()
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title", "")).strip()
+            action = str(item.get("action", "")).strip()
+            if not title or not action or title.lower() in seen:
+                continue
+            seen.add(title.lower())
+            priority = str(item.get("priority", "Medium")).strip().capitalize()
+            if priority not in ("High", "Medium", "Low"):
+                priority = "Medium"
+            based_on = str(item.get("based_on", "")).strip() or title
+            recommendations.append({
+                "title": title,
+                "action": action,
+                "priority": priority,
+                "based_on": based_on,
+            })
+        if not recommendations:
+            return None
+        order = {"High": 0, "Medium": 1, "Low": 2}
+        recommendations.sort(key=lambda rec: order.get(rec["priority"], 3))
+        return recommendations
+    except Exception as exc:
+        logger.warning("Ollama recommendations error: %s", exc)
+        return None
+

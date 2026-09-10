@@ -5,6 +5,14 @@ from datetime import datetime, timedelta
 from ai_service import (generate_interview_questions, analyze_responses, generate_summary,
                         generate_recommendations)
 import gemini_ai
+
+# Optional Ollama AI layer (local model, no API key needed). The app works
+# fine without it -- every Ollama use falls back gracefully when missing.
+try:
+    import ollama_ai
+except ImportError:  # pragma: no cover
+    ollama_ai = None
+
 import json
 import logging
 import csv
@@ -405,18 +413,30 @@ def parse_keywords(text):
 
 
 def build_gemini_cfg(user_id):
-    """Build the Gemini AI config for the current user.
+    """Build the AI config for the current user.
 
     Returned config is passed to ai_service functions. When Gemini is not
     configured/enabled, the config has enabled=False and ai_service
     automatically falls back to the built-in rule-based logic.
+
+    The Ollama (local model) configuration is attached under the "ollama" key
+    so ai_service can try it whenever Gemini is unavailable/disabled.
     """
     try:
-        return gemini_ai.get_config(user_id)
+        cfg = dict(gemini_ai.get_config(user_id))
     except Exception as exc:
         logger.warning(f"Gemini config unavailable: {exc}")
         default_model = gemini_ai.DEFAULT_MODEL if gemini_ai else ""
-        return {"enabled": False, "api_key": "", "model": default_model, "source": ""}
+        cfg = {"enabled": False, "api_key": "", "model": default_model, "source": ""}
+    if ollama_ai is not None:
+        try:
+            cfg["ollama"] = ollama_ai.get_config(user_id)
+        except Exception as exc:
+            logger.warning(f"Ollama config unavailable: {exc}")
+            cfg["ollama"] = {"enabled": False, "url": ollama_ai.DEFAULT_URL,
+                             "model": ollama_ai.DEFAULT_MODEL, "has_url": False, "source": ""}
+    return cfg
+
 
 
 def next_code(conn, table, column, prefix):
@@ -2318,6 +2338,30 @@ def settings_page():
             logger.info(f"Admin '{username}' updated SYSTEM-WIDE Gemini AI settings (state={state}, model={model})")
             flash(f"Gemini AI settings saved for the WHOLE system! Gemini is now {state} for all accounts.", "success")
             return redirect(url_for('settings_page'))
+
+        elif form_type == "ollama_api":
+            # Ollama AI (local model, no API key) configuration — ADMIN ONLY, SYSTEM-WIDE.
+            # Saved under user_id = 0 (global), same as the Gemini settings.
+            if not is_privileged_user():
+                logger.warning(f"User '{username}' tried to change Ollama AI settings without staff rights")
+                flash("🔒 Only the administrator (Dean/staff) can configure the Ollama AI server.", "error")
+                return redirect(url_for('settings_page'))
+            enabled = "1" if request.form.get("ollama_enabled") == "on" else "0"
+            url = (request.form.get("ollama_url") or "").strip()
+            model = (request.form.get("ollama_model") or "").strip()
+            if enabled == "1" and not url:
+                flash("No Ollama server URL provided — Ollama AI stays disabled.", "error")
+                set_setting(0, "ollama_enabled", "0")
+                return redirect(url_for('settings_page'))
+            set_setting(0, "ollama_enabled", enabled)
+            set_setting(0, "ollama_url", url)
+            set_setting(0, "ollama_model", model or (ollama_ai.DEFAULT_MODEL if ollama_ai else ""))
+            if ollama_ai is not None:
+                ollama_ai.reset_circuit_breaker()
+            state = "enabled" if enabled == "1" else "disabled"
+            logger.info(f"Admin '{username}' updated SYSTEM-WIDE Ollama AI settings (state={state}, url={url}, model={model})")
+            flash(f"Ollama AI settings saved for the WHOLE system! Ollama is now {state} for all accounts.", "success")
+            return redirect(url_for('settings_page'))
     
     defaults = {
         'verifier_name': get_setting(user_id, "default_verifier_name", ""),
@@ -2340,10 +2384,33 @@ def settings_page():
         'model': get_setting(0, "ai_model", gemini_ai.DEFAULT_MODEL),
         'is_admin': is_privileged_user(),
     }
-    
+    if ollama_ai is not None:
+        try:
+            ollama_cfg = ollama_ai.get_config(0)
+        except Exception as exc:
+            logger.warning(f"Ollama config unavailable: {exc}")
+            ollama_cfg = {"enabled": False, "url": ollama_ai.DEFAULT_URL,
+                          "model": ollama_ai.DEFAULT_MODEL, "has_url": False}
+        ollama = {
+            'enabled': ollama_cfg.get("enabled", False),
+            'url': ollama_cfg.get("url", ollama_ai.DEFAULT_URL),
+            'model': ollama_cfg.get("model", ollama_ai.DEFAULT_MODEL),
+            'suggested_models': ollama_ai.SUGGESTED_MODELS,
+            'available': ollama_ai is not None,
+        }
+    else:
+        ollama = {
+            'enabled': False,
+            'url': "http://localhost:11434",
+            'model': "",
+            'suggested_models': [],
+            'available': False,
+        }
+
     return render_template("settings.html", user=user, login_history=login_history,
-                           defaults=defaults, ai=ai, ai_api=ai_api, active='settings',
-                           is_admin=is_privileged_user())
+                           defaults=defaults, ai=ai, ai_api=ai_api, ollama=ollama,
+                           active='settings', is_admin=is_privileged_user())
+
 
 
 @app.route("/settings/test-ai", methods=["POST"])
@@ -2367,6 +2434,47 @@ def test_ai_connection():
     except Exception as exc:
         logger.error(f"Test AI connection error: {exc}", exc_info=True)
         return jsonify({"ok": False, "message": f"Server error: {str(exc)}"})
+
+
+@app.route("/settings/test-ollama", methods=["POST"])
+@login_required
+def test_ollama_connection():
+    """AJAX endpoint: test the Ollama server connection with the form's URL/model."""
+    if ollama_ai is None:
+        return jsonify({"ok": False, "message": "Ollama support module (ollama_ai.py) is not installed."})
+    try:
+        url = (request.form.get("ollama_url") or "").strip() \
+            or get_setting(0, "ollama_url", "") or ollama_ai.DEFAULT_URL
+        model = (request.form.get("ollama_model") or "").strip() \
+            or get_setting(0, "ollama_model", "") or ollama_ai.DEFAULT_MODEL
+        ok, message = ollama_ai.test_connection(url=url, model=model)
+        if ok:
+            ollama_ai.reset_circuit_breaker()
+        logger.info(f"User '{session.get('username', 'User')}' tested Ollama connection: "
+                    f"{'OK' if ok else message}")
+        return jsonify({"ok": ok, "message": message})
+    except Exception as exc:
+        logger.error(f"Test Ollama connection error: {exc}", exc_info=True)
+        return jsonify({"ok": False, "message": f"Server error: {str(exc)}"})
+
+
+@app.route("/settings/ollama-models", methods=["POST"])
+@login_required
+def list_ollama_models():
+    """AJAX endpoint: list models installed on the Ollama server (GET /api/tags)."""
+    if ollama_ai is None:
+        return jsonify({"ok": False, "models": [], "message": "Ollama support module (ollama_ai.py) is not installed."})
+    try:
+        url = (request.form.get("ollama_url") or "").strip() \
+            or get_setting(0, "ollama_url", "") or ollama_ai.DEFAULT_URL
+        ok, result = ollama_ai.list_models(url=url)
+        if ok:
+            return jsonify({"ok": True, "models": result, "message": f"Found {len(result)} model(s) on {url}."})
+        return jsonify({"ok": False, "models": [], "message": str(result)})
+    except Exception as exc:
+        logger.error(f"List Ollama models error: {exc}", exc_info=True)
+        return jsonify({"ok": False, "models": [], "message": f"Server error: {str(exc)}"})
+
 
 
 # ============ EXPORT / DATA MANAGEMENT ROUTES ============
