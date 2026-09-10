@@ -36,8 +36,15 @@ MAX_OUTPUT_TOKENS = 4096
 # ---- Circuit breaker: after repeated failures, pause AI calls for a while ----
 _consecutive_failures = 0
 _disabled_until = 0.0
-FAIL_LIMIT = 2
-COOLDOWN_SECONDS = 120
+FAIL_LIMIT = 5
+COOLDOWN_SECONDS = 30
+
+
+def reset_circuit_breaker():
+    """Reset the circuit breaker (e.g., when API key is updated)."""
+    global _consecutive_failures, _disabled_until
+    _consecutive_failures = 0
+    _disabled_until = 0.0
 
 
 class GeminiError(Exception):

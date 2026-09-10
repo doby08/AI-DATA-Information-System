@@ -15,14 +15,12 @@ import tempfile
 from functools import wraps
 import hashlib
 import time
-import threading
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'your_secret_key_here')  # Set SECRET_KEY env var in production
+app.secret_key = 'your_secret_key_here'  # Change this to a secure secret key
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # "Remember me" duration
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE = os.environ.get("DATABASE_PATH", os.path.join(BASE_DIR, "data.db"))
+DATABASE = "data.db"
 
 # Unified stakeholder categories used for account registration, login
 # authentication ("Login as"), interview participant roles, and session grouping.
@@ -37,21 +35,13 @@ USER_CATEGORIES = [
     "Department Head/Program Chair",
     "Staff Employee",
     "Guidance Counselor",
-    "Staff",
-    "Instructor",
-    "Owner/Admin",
 ]
 
 # Display normalization for legacy stakeholder values stored before categories existed
 CATEGORY_DISPLAY_MAP = {
     "student": "Student",
-    "instructor": "Instructor",
+    "instructor": "Faculty",
     "": "Unspecified",
-    "staff": "Staff",
-    "owner": "Owner/Admin",
-    "owner/admin": "Owner/Admin",
-    "admin": "Owner/Admin",
-    "administrator": "Owner/Admin",
     None: "Unspecified",
 }
 
@@ -66,22 +56,12 @@ PRIVILEGED_CATEGORIES = {
     "Staff Employee",
     "Department Head/Program Chair",
     "Guidance Counselor",
-    "Staff",
-    "Instructor",
-    "Owner/Admin",
 }
 
 # Categories that may self-register on the public Register page. Accounts for
 # Dean, Faculty, Staff and other positions are created by an administrator in
 # Manage Accounts (/accounts) so nobody can promote themselves.
-REGISTRATION_CATEGORIES = ["Student", "Applicant", "Staff", "Instructor"]
-
-# Owner/Admin bootstrap (env-configurable, never exposed to frontend).
-# Set OWNER_USERNAME / OWNER_PASSWORD env vars to override defaults.
-OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "Dan")
-OWNER_PASSWORD = os.environ.get("OWNER_PASSWORD", "10231998")
-OWNER_ROLE = "Owner/Admin"
-
+REGISTRATION_CATEGORIES = ["Student", "Applicant"]
 
 # Expose to all templates (used for nav visibility of Manage Accounts)
 app.jinja_env.globals['PRIVILEGED_CATEGORIES'] = PRIVILEGED_CATEGORIES
@@ -97,15 +77,13 @@ def display_category(raw_role):
     return CATEGORY_DISPLAY_MAP.get(key.lower(), key)
 
 # ============ LOGGING CONFIGURATION ============
-_log_handlers = [logging.StreamHandler()]
-try:
-    _log_handlers.append(logging.FileHandler(os.path.join(BASE_DIR, 'app.log')))
-except OSError:
-    pass  # read-only filesystem on some hosts -> stdout logging only
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=_log_handlers
+    handlers=[
+        logging.FileHandler('app.log'),
+        logging.StreamHandler()
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -308,7 +286,7 @@ def init_db():
         pass  # Column already exists
 
     # Profile pictures live in /static/uploads/avatars
-    os.makedirs(os.path.join(BASE_DIR, "static", "uploads", "avatars"), exist_ok=True)
+    os.makedirs(os.path.join("static", "uploads", "avatars"), exist_ok=True)
 
     # Migration: unique auto-generated IDs (client/account + interview) and verifier department
     try:
@@ -356,136 +334,6 @@ def init_db():
         logger.info("Migration applied: added additional_instructions column to interview_sessions")
     except sqlite3.OperationalError:
         pass  # Column already exists
-
-    # Migration: respondent tracking - name and duration for each response
-    try:
-        cursor.execute("ALTER TABLE interview_responses ADD COLUMN respondent_name TEXT")
-        logger.info("Migration applied: added respondent_name column to interview_responses")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-
-    try:
-        cursor.execute("ALTER TABLE interview_responses ADD COLUMN response_duration INTEGER DEFAULT 0")
-        logger.info("Migration applied: added response_duration column to interview_responses")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-
-    # Migration: Customer support tables
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS support_tickets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            username TEXT NOT NULL,
-            category TEXT,
-            subject TEXT NOT NULL,
-            message TEXT NOT NULL,
-            priority TEXT DEFAULT 'medium',
-            status TEXT DEFAULT 'open',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-    logger.info("Migration applied: created support_tickets table")
-    
-    # Migration: Add missing columns to existing support_tickets table
-    try:
-        cursor.execute("ALTER TABLE support_tickets ADD COLUMN priority TEXT DEFAULT 'medium'")
-        logger.info("Migration applied: added priority column to support_tickets")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    try:
-        cursor.execute("ALTER TABLE support_tickets ADD COLUMN category TEXT")
-        logger.info("Migration applied: added category column to support_tickets")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS system_suggestions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            username TEXT NOT NULL,
-            suggestion_type TEXT,
-            suggestion_title TEXT,
-            suggestion TEXT NOT NULL,
-            benefit TEXT DEFAULT 'my_role',
-            status TEXT DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    """)
-    logger.info("Migration applied: created system_suggestions table")
-    
-    # Migration: Add missing columns to existing system_suggestions table
-    try:
-        cursor.execute("ALTER TABLE system_suggestions ADD COLUMN suggestion_type TEXT")
-        logger.info("Migration applied: added suggestion_type column to system_suggestions")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    try:
-        cursor.execute("ALTER TABLE system_suggestions ADD COLUMN suggestion_title TEXT")
-        logger.info("Migration applied: added suggestion_title column to system_suggestions")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-    
-    try:
-        cursor.execute("ALTER TABLE system_suggestions ADD COLUMN benefit TEXT DEFAULT 'my_role'")
-        logger.info("Migration applied: added benefit column to system_suggestions")
-    except sqlite3.OperationalError:
-        pass  # Column already exists
-
-    # Migration: registration profile fields (Full Name / Student ID / School)
-    for _ddl, _label in [
-        ("ALTER TABLE users ADD COLUMN full_name TEXT", "full_name"),
-        ("ALTER TABLE users ADD COLUMN student_id TEXT", "student_id"),
-        ("ALTER TABLE users ADD COLUMN school TEXT", "school"),
-    ]:
-        try:
-            cursor.execute(_ddl)
-            logger.info(f"Migration applied: added {_label} column to users")
-        except sqlite3.OperationalError:
-            pass  # Column already exists
-
-    # Backfill: existing username becomes the display Full Name when empty.
-    try:
-        cursor.execute("UPDATE users SET full_name = username WHERE full_name IS NULL OR TRIM(full_name) = ''")
-    except sqlite3.OperationalError:
-        pass
-
-    # Owner/Admin bootstrap — ensures the system owner account exists. The
-    # password is stored only as a hash (env-configurable via OWNER_USERNAME /
-    # OWNER_PASSWORD) and is never exposed to the frontend or templates.
-    try:
-        owner = cursor.execute(
-            "SELECT id, password, role FROM users WHERE LOWER(username) = LOWER(?)",
-            (OWNER_USERNAME,),
-        ).fetchone()
-        if not owner:
-            cursor.execute(
-                """
-                INSERT INTO users (username, password, email, role, full_name, school)
-                VALUES (?, ?, '', ?, ?, 'System Administration')
-                """,
-                (OWNER_USERNAME, hash_password(OWNER_PASSWORD), OWNER_ROLE, OWNER_USERNAME),
-            )
-            owner_id = cursor.lastrowid
-            account_code = next_code(conn, "users", "account_code", "ACC")
-            cursor.execute("UPDATE users SET account_code = ? WHERE id = ?", (account_code, owner_id))
-            logger.info(f"Owner/Admin bootstrap: created owner account '{OWNER_USERNAME}'")
-        else:
-            owner_id, owner_pw, owner_role = owner
-            updates = {}
-            if not verify_password(OWNER_PASSWORD, owner_pw or ""):
-                updates["password"] = hash_password(OWNER_PASSWORD)
-            if (owner_role or "") != OWNER_ROLE:
-                updates["role"] = OWNER_ROLE
-            if updates:
-                sets = ", ".join(f"{k} = ?" for k in updates)
-                cursor.execute(f"UPDATE users SET {sets} WHERE id = ?", (*updates.values(), owner_id))
-                logger.info(f"Owner/Admin bootstrap: repaired owner account '{OWNER_USERNAME}'")
-    except sqlite3.Error as exc:
-        logger.warning(f"Owner/Admin bootstrap skipped: {exc}")
 
     conn.commit()
     conn.close()
@@ -669,9 +517,8 @@ def login():
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT id, password, role, username FROM users "
-            "WHERE LOWER(username) = LOWER(?) OR (email IS NOT NULL AND email != '' AND LOWER(email) = LOWER(?))",
-            (username, username)
+            "SELECT id, password, role, username FROM users WHERE LOWER(username) = LOWER(?)",
+            (username,)
         )
         user = cursor.fetchone()
         
@@ -720,9 +567,9 @@ def login():
                     logger.warning(f"Legacy account '{canonical_username}' tried to self-assign staff category '{chosen_role}'")
                     return render_template(
                         "login.html",
-                        error=("Staff/office categories (Dean, Faculty, Staff, Instructor, "
-                               "Department Head, Guidance Counselor) can only be assigned by an "
-                               "administrator. Please login as Student or Applicant."),
+                        error=("Staff/office categories (Dean, Faculty, Staff, Department Head, "
+                               "Guidance Counselor) can only be assigned by an administrator. "
+                               "Please login as Student or Applicant."),
                         categories=USER_CATEGORIES
                     )
                 stored_role = chosen_role
@@ -791,65 +638,53 @@ def login():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "POST":
-        full_name = request.form.get("full_name", "").strip()
-        student_id = request.form.get("student_id", "").strip()
-        email = request.form.get("email", "").strip()
-        school = request.form.get("school", "").strip()
-        role = request.form.get("role", "").strip()
+        username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
-        confirm_password = request.form.get("confirm_password", "")
+        email = request.form.get("email", "").strip()
+        role = request.form.get("role", "").strip()
 
-        # Backward compatibility: older clients/tests may still post 'username'
-        if not full_name:
-            full_name = request.form.get("username", "").strip()
-
-        # ---- Field-level validation (errors shown beside each field) ----
-        errors = {}
-        if not full_name:
-            errors["full_name"] = "Full Name is required."
+        # Public registration is limited to non-staff categories. Accounts for
+        # Dean, Faculty, Staff and other positions are created by an admin in
+        # Manage Accounts so nobody can promote themselves.
         if role not in REGISTRATION_CATEGORIES:
-            errors["role"] = ("Please choose a valid account category "
-                              "(Student, Applicant, Staff, or Instructor).")
-        if role == "Student" and not student_id:
-            errors["student_id"] = "Student ID is required for Student accounts."
-        if not email or "@" not in email or "." not in email.split("@")[-1] or " " in email:
-            errors["email"] = "Please enter a valid email address (e.g., juan.delacruz@gmail.com)."
-        if not school:
-            errors["school"] = "School is required."
-        if not password:
-            errors["password"] = "Password is required."
-        elif len(password) < 6:
-            errors["password"] = "Password must be at least 6 characters."
-        if password and confirm_password != password:
-            errors["confirm_password"] = "Passwords do not match."
+            return render_template(
+                "register.html",
+                error=("Only Student and Applicant accounts can self-register. Accounts for "
+                       "Dean, Faculty, Staff and other positions are created by an administrator."),
+                categories=REGISTRATION_CATEGORIES)
 
-        form = {"full_name": full_name, "student_id": student_id,
-                "email": email, "school": school, "role": role}
-        if errors:
-            return render_template("register.html", errors=errors, form=form,
+        if not username or not password:
+            return render_template("register.html",
+                                   error="Username and password are required.",
                                    categories=REGISTRATION_CATEGORIES)
 
-        # The login username is derived from the Full Name; a numeric suffix is
-        # appended automatically when the name is already taken.
+        logger.info(f"Registration attempt for user '{username}' (category: {role})")
+        
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
+        
         try:
-            base_username = full_name
-            username = base_username
-            suffix = 2
-            while cursor.execute(
-                "SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)", (username,)
-            ).fetchone():
-                username = f"{base_username} {suffix}"
-                suffix += 1
+            # Case-insensitive username check (so 'Dan' and 'dan' are the same name)
+            existing = cursor.execute(
+                "SELECT username FROM users WHERE LOWER(username) = LOWER(?)", (username,)
+            ).fetchone()
+            if existing:
+                conn.close()
+                logger.warning(f"Registration failed - username '{username}' already taken (as '{existing[0]}')")
+                return render_template(
+                    "register.html",
+                    error=(f"The username '{username}' is already taken"
+                           + (f" (registered as '{existing[0]}')" if existing[0] != username else "")
+                           + ". Please choose a different username."),
+                    categories=REGISTRATION_CATEGORIES)
 
             hashed_password = hash_password(password)
             cursor.execute(
                 """
-                INSERT INTO users (username, password, email, role, full_name, student_id, school)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (username, password, email, role)
+                VALUES (?, ?, ?, ?)
                 """,
-                (username, hashed_password, email, role, full_name, student_id, school)
+                (username, hashed_password, email, role)
             )
             new_user_id = cursor.lastrowid
             if new_user_id:
@@ -857,18 +692,16 @@ def register():
                 conn.execute("UPDATE users SET account_code = ? WHERE id = ?", (account_code, new_user_id))
             conn.commit()
             conn.close()
-
-            logger.info(f"New user '{username}' registered successfully (category: {role})")
+            
+            logger.info(f"New user '{username}' registered successfully")
             return redirect("/login")
         except sqlite3.IntegrityError:
             conn.close()
-            logger.warning("Registration failed - account already exists")
-            return render_template(
-                "register.html",
-                errors={"full_name": "An account with this Full Name already exists. Try adding your middle name."},
-                form=form,
-                categories=REGISTRATION_CATEGORIES)
-
+            logger.warning(f"Registration failed - username '{username}' already exists")
+            return render_template("register.html",
+                                   error="That username is already taken. Please choose a different one.",
+                                   categories=REGISTRATION_CATEGORIES)
+    
     return render_template("register.html", categories=REGISTRATION_CATEGORIES)
 
 
@@ -1264,41 +1097,16 @@ def interviews_list():
     username = session.get('username', 'User')
     logger.info(f"User '{username}' accessed interviews list")
     
-    search_query = request.args.get("q", "").strip()
-    
     conn = sqlite3.connect(DATABASE)
-    
-    if search_query:
-        # Search across title, role, verifier name, and interview code
-        search_pattern = f"%{search_query}%"
-        rows = conn.execute(
-            """
-            SELECT s.*, u.username
-            FROM interview_sessions s
-            LEFT JOIN users u ON s.created_by = u.id
-            WHERE s.deleted_at IS NULL
-              AND (
-                  s.title LIKE ? OR
-                  s.user_role LIKE ? OR
-                  s.verifier_name LIKE ? OR
-                  s.interview_code LIKE ? OR
-                  CAST(s.id AS TEXT) LIKE ?
-              )
-            ORDER BY s.created_at DESC
-            """,
-            (search_pattern, search_pattern, search_pattern, search_pattern, search_pattern)
-        ).fetchall()
-    else:
-        rows = conn.execute(
-            """
-            SELECT s.*, u.username
-            FROM interview_sessions s
-            LEFT JOIN users u ON s.created_by = u.id
-            WHERE s.deleted_at IS NULL
-            ORDER BY s.created_at DESC
-            """
-        ).fetchall()
-    
+    rows = conn.execute(
+        """
+        SELECT s.*, u.username
+        FROM interview_sessions s
+        LEFT JOIN users u ON s.created_by = u.id
+        WHERE s.deleted_at IS NULL
+        ORDER BY s.created_at DESC
+        """
+    ).fetchall()
     conn.close()
 
     # Build (session, can_manage) pairs — privacy: everyone may view,
@@ -1325,8 +1133,7 @@ def interviews_list():
         selected_category=selected or "All",
         user_id=session.get('user_id'),
         is_privileged=is_privileged_user(),
-        active='history',
-        search_query=search_query
+        active='history'
     )
 
 
@@ -1338,7 +1145,16 @@ def new_interview():
     
     if request.method == "POST":
         title = request.form["title"]
-        user_role = request.form["user_role"].strip()
+        user_role = request.form["user_role"]
+        verifier_name = request.form.get("verifier_name", "").strip()
+        verifier_department = request.form.get("verifier_department", "").strip()
+        verifier_date = request.form.get("verifier_date", "")
+        verifier_time = request.form.get("verifier_time", "")
+
+        # Unified stakeholder categories ... AI Question Setup fields.
+        # The number of questions is configured HERE by the admin and stored on
+        # the session, so all respondents answer exactly the same question set.
+        interview_objectives = request.form.get("interview_objectives", "").strip()
         additional_instructions = request.form.get("additional_instructions", "").strip()
         try:
             num_respondents = max(1, int(request.form.get("num_respondents", "1") or 1))
@@ -1350,21 +1166,22 @@ def new_interview():
             num_questions = 0
         if num_questions <= 0:
             num_questions = int(get_setting(user_id, "default_question_count", "5") or 5)
-        num_questions = max(1, min(50, num_questions))
+        num_questions = max(1, min(15, num_questions))
         num_respondents = max(1, min(999, num_respondents))
 
         logger.info(f"User '{username}' creating new interview session: {title}")
-        logger.info(f"Interview role: {user_role}, Questions: {num_questions}")
+        logger.info(f"Interview role: {user_role}, Verifier: {verifier_name}, Date: {verifier_date}, Time: {verifier_time}")
 
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         
         cursor.execute(
             """
-            INSERT INTO interview_sessions (title, user_role, verifier_name, verifier_date, verifier_time, status, created_by, verifier_department, num_respondents, num_questions, additional_instructions)
-            VALUES (?, ?, '', '', '', 'planning', ?, '', ?, ?, ?)
+            INSERT INTO interview_sessions (title, user_role, verifier_name, verifier_date, verifier_time, status, created_by, verifier_department, num_respondents, num_questions, interview_objectives, additional_instructions)
+            VALUES (?, ?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?, ?)
             """,
-            (title, user_role, user_id, num_respondents, num_questions, additional_instructions)
+            (title, user_role, verifier_name, verifier_date, verifier_time, user_id, verifier_department,
+             num_respondents, num_questions, interview_objectives, additional_instructions)
         )
         conn.commit()
         session_id = cursor.lastrowid
@@ -1378,12 +1195,13 @@ def new_interview():
         # question set is generated ONCE during setup and saved to the database,
         # so every respondent in this interview answers the SAME questions and
         # their responses can be compared and analyzed.
-        # The AI uses the interview title and stakeholder role to generate relevant questions.
-        extra_context = f"{title}. Stakeholder role: {user_role}"
+        topics = title
+        if interview_objectives:
+            topics = f"{title}. Objectives: {interview_objectives}"
         questions = generate_interview_questions("basic_gathering", user_role,
                                                  max_questions=num_questions,
                                                  gemini_cfg=build_gemini_cfg(user_id),
-                                                 extra_context=extra_context)
+                                                 extra_context=topics)
         
         for question in questions:
             conn.execute(
@@ -1401,9 +1219,14 @@ def new_interview():
         # Send the admin straight to AI Question Setup to review the generated set.
         return redirect(f"/interview/setup/{session_id}")
     
-    # Pre-fill default question count saved in Settings
-    default_q = get_setting(user_id, "default_question_count", "5")
-    return render_template("interview_new.html", defaults={'num_questions': default_q}, active='setup')
+    # Pre-fill defaults saved in Settings
+    defaults = {
+        'verifier_name': get_setting(user_id, "default_verifier_name", ""),
+        'verifier_role': get_setting(user_id, "default_verifier_role", username),
+        'num_questions': get_setting(user_id, "default_question_count", "5"),
+    }
+    return render_template("interview_new.html", defaults=defaults, categories=USER_CATEGORIES,
+                           active='setup')
 
 
 # ============ AI QUESTION SETUP ============
@@ -1437,38 +1260,24 @@ def interview_setup(session_id):
     if not meta['num_questions'] or meta['num_questions'] <= 0:
         meta['num_questions'] = len(questions) or 5
 
-    # Pagination: 10 questions per page
-    per_page = 10
-    total_questions = len(questions)
-    total_pages = max(1, (total_questions + per_page - 1) // per_page)
-    page = request.args.get('page', 1, type=int)
-    page = max(1, min(page, total_pages))
-    start_idx = (page - 1) * per_page
-    end_idx = start_idx + per_page
-    paginated_questions = questions[start_idx:end_idx]
-
     logger.info(f"User '{username}' opened AI Question Setup for session {session_id}")
     return render_template("interview_setup.html", sdata=session_data, meta=meta,
-                           questions=paginated_questions, all_questions=questions,
-                           can_manage=can_manage,
-                           is_privileged=is_privileged_user(), active='setup',
-                           page=page, total_pages=total_pages,
-                           total_questions=total_questions,
-                           per_page=per_page)
+                           questions=questions, can_manage=can_manage,
+                           is_privileged=is_privileged_user(), active='setup')
 
 
 def _rebuild_question_set(conn, session_id, meta, qty):
     """Delete the current questions and generate a fresh set of exactly `qty`
     questions for the session (single source of truth for the session)."""
-    title = meta.get('title') or "Interview"
-    role = meta.get('role') or "Stakeholder"
-    extra_context = f"{title}. Stakeholder role: {role}"
+    topics = meta.get('title') or "Interview"
+    if meta.get('objectives'):
+        topics = f"{topics}. Objectives: {meta['objectives']}"
     conn.execute("DELETE FROM interview_questions WHERE session_id = ?", (session_id,))
     questions = generate_interview_questions(
-        "basic_gathering", role,
+        "basic_gathering", meta.get('role') or "Stakeholder",
         max_questions=qty,
         gemini_cfg=build_gemini_cfg(session.get('user_id')),
-        extra_context=extra_context)
+        extra_context=topics)
     for question in questions:
         conn.execute(
             "INSERT INTO interview_questions (session_id, question_text, category, suggested_by) VALUES (?, ?, ?, 'ai')",
@@ -1499,11 +1308,11 @@ def regenerate_questions(session_id):
     qty = meta.get('num_questions')
     if not qty or qty <= 0:
         qty = int(request.form.get("num_questions", 5) or 5)
-        qty = max(1, min(50, qty))
+        qty = max(1, min(15, qty))
         conn.execute("UPDATE interview_sessions SET num_questions = ? WHERE id = ?", (qty, session_id))
         conn.commit()
     else:
-        qty = max(1, min(50, int(qty)))
+        qty = max(1, min(15, int(qty)))
 
     questions = _rebuild_question_set(conn, session_id, meta, qty)
     conn.commit()
@@ -1538,15 +1347,16 @@ def update_session_details(session_id):
             return fallback
 
     num_respondents = _clamp(request.form.get("num_respondents"), 1, 999, 1)
-    num_questions = _clamp(request.form.get("num_questions"), 1, 50, 5)
+    num_questions = _clamp(request.form.get("num_questions"), 1, 15, 5)
+    objectives = (request.form.get("interview_objectives") or "").strip()
     instructions = (request.form.get("additional_instructions") or "").strip()
 
     conn.execute(
         """UPDATE interview_sessions
            SET num_respondents = ?, num_questions = ?,
-               additional_instructions = ?
+               interview_objectives = ?, additional_instructions = ?
            WHERE id = ?""",
-        (num_respondents, num_questions, instructions, session_id)
+        (num_respondents, num_questions, objectives, instructions, session_id)
     )
 
     # Keep the question set in sync with the configured count: if the admin
@@ -1598,35 +1408,10 @@ def update_question_set(session_id):
             (text, qid, session_id)
         )
         saved += 1
-
-    # Delete questions the creator marked for removal
-    remove_ids = request.form.getlist("remove_question_ids")
-    for qid in remove_ids:
-        conn.execute(
-            "DELETE FROM interview_questions WHERE id = ? AND session_id = ?",
-            (qid, session_id)
-        )
-
-    # Keep the configured question count in sync with the edited set
-    remaining = conn.execute(
-        "SELECT COUNT(*) FROM interview_questions WHERE session_id = ?", (session_id,)
-    ).fetchone()[0]
-    remaining = max(1, remaining)
-    conn.execute(
-        "UPDATE interview_sessions SET num_questions = ? WHERE id = ?",
-        (remaining, session_id)
-    )
-
     conn.commit()
     conn.close()
-    removed = len(remove_ids)
-    if removed:
-        logger.info(f"Removed {removed} question(s) from session {session_id} (remaining: {remaining})")
     logger.info(f"Official question set saved for session {session_id} ({saved} questions) by '{username}'")
-    if removed:
-        flash(f"Saved. Removed {removed} question(s) — the set now has {remaining} questions.", "success")
-    else:
-        flash("Question set saved. Every respondent will answer exactly these questions.", "success")
+    flash("Question set saved. Every respondent will answer exactly these questions.", "success")
     return redirect(f"/interview/setup/{session_id}")
 
 
@@ -1694,41 +1479,6 @@ def conduct_interview(session_id):
                            questions=questions, is_privileged=is_privileged_user(), active='sessions')
 
 
-def _keyword_key_points(response_text, user_id):
-    """Instant, offline key-point extraction (no AI call — milliseconds)."""
-    pain_words = parse_keywords(get_setting(user_id, "ai_pain_keywords", ""))
-    feature_words = parse_keywords(get_setting(user_id, "ai_feature_keywords", ""))
-    workflow_words = parse_keywords(get_setting(user_id, "ai_workflow_keywords", ""))
-    return analyze_responses([response_text],
-                             pain_indicators=pain_words or None,
-                             feature_indicators=feature_words or None,
-                             workflow_indicators=workflow_words or None)
-
-
-def _reanalyze_key_points_background(response_id, response_text, user_id):
-    """Re-run the AI (Gemini) key-point analysis in a background thread.
-
-    Saving/editing a response must feel instant, so the caller stores
-    keyword-based points immediately and this thread quietly upgrades them
-    with AI-generated points a few seconds later. Failures are logged and
-    never affect the user."""
-    def _work():
-        try:
-            key_points = analyze_responses([response_text],
-                                           gemini_cfg=build_gemini_cfg(user_id))
-            conn = sqlite3.connect(DATABASE)
-            conn.execute(
-                "UPDATE interview_responses SET key_points = ? WHERE id = ?",
-                (json.dumps(key_points), response_id)
-            )
-            conn.commit()
-            conn.close()
-            logger.info(f"Background AI key points saved for response {response_id}")
-        except Exception as exc:
-            logger.warning(f"Background key-point analysis skipped for response {response_id}: {exc}")
-    threading.Thread(target=_work, daemon=True, name=f"keypoints-{response_id}").start()
-
-
 @app.route("/api/save-response", methods=["POST"])
 @login_required
 def save_response():
@@ -1737,8 +1487,6 @@ def save_response():
     session_id = data.get("session_id")
     question_id = data.get("question_id")
     response_text = data.get("response_text")
-    respondent_name = data.get("respondent_name", "")
-    response_duration = data.get("response_duration", 0)
     
     logger.info(f"User '{username}' saving response for session {session_id}, question {question_id}")
     
@@ -1751,163 +1499,35 @@ def save_response():
         return jsonify({"status": "error",
                         "message": "Only the creator of this interview can record responses."}), 403
 
-    cursor = conn.execute(
+    conn.execute(
         """
-        INSERT INTO interview_responses (session_id, question_id, response_text, transcription, respondent_name, response_duration)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO interview_responses (session_id, question_id, response_text, transcription)
+        VALUES (?, ?, ?, ?)
         """,
-        (session_id, question_id, response_text, response_text, respondent_name, response_duration)
+        (session_id, question_id, response_text, response_text)
     )
     conn.commit()
-    response_id = cursor.lastrowid
     
-    # Instant keyword-based key points (no AI wait), then upgrade with AI
-    # quietly in the background so the interviewer moves on immediately.
+    # Extract key points from response (using custom AI keywords from Settings)
     user_id = session.get('user_id')
-    key_points = _keyword_key_points(response_text, user_id)
+    pain_words = parse_keywords(get_setting(user_id, "ai_pain_keywords", ""))
+    feature_words = parse_keywords(get_setting(user_id, "ai_feature_keywords", ""))
+    workflow_words = parse_keywords(get_setting(user_id, "ai_workflow_keywords", ""))
+    key_points = analyze_responses([response_text],
+                                   pain_indicators=pain_words or None,
+                                   feature_indicators=feature_words or None,
+                                   workflow_indicators=workflow_words or None,
+                                   gemini_cfg=build_gemini_cfg(user_id))
+    
     conn.execute(
-        "UPDATE interview_responses SET key_points = ? WHERE id = ?",
-        (json.dumps(key_points), response_id)
+        "UPDATE interview_responses SET key_points = ? WHERE session_id = ? AND question_id = ?",
+        (json.dumps(key_points), session_id, question_id)
     )
     conn.commit()
     conn.close()
-    
-    _reanalyze_key_points_background(response_id, response_text, user_id)
     
     logger.info(f"Response saved successfully for session {session_id}, question {question_id}")
     return jsonify({"status": "success", "key_points": key_points})
-
-
-@app.route("/api/edit-response", methods=["POST"])
-@login_required
-def edit_response():
-    """Edit an existing response in an interview session.
-
-    Accepts `response_id` (preferred — exact row) or the legacy
-    `response_index` (position among the session's responses)."""
-    username = session.get('username', 'User')
-    data = request.json
-    session_id = data.get("session_id")
-    response_id = data.get("response_id")
-    response_index = data.get("response_index", 0)
-    response_text = data.get("response_text")
-    
-    logger.info(f"User '{username}' editing response for session {session_id}")
-    
-    if not response_text or not response_text.strip():
-        return jsonify({"status": "error", "message": "Response text cannot be empty."}), 400
-    
-    conn = sqlite3.connect(DATABASE)
-    
-    # Privacy: only the creator can edit responses
-    creator_id = get_session_creator(conn, session_id)
-    if not can_manage_session(creator_id):
-        conn.close()
-        return jsonify({"status": "error", "message": "Only the creator of this interview can edit responses."}), 403
-    
-    if response_id is not None:
-        row = conn.execute(
-            "SELECT id FROM interview_responses WHERE id = ? AND session_id = ?",
-            (response_id, session_id)
-        ).fetchone()
-        if not row:
-            conn.close()
-            return jsonify({"status": "error", "message": "Response not found."}), 404
-        response_id = row[0]
-    else:
-        # Legacy index-based lookup (kept for backward compatibility)
-        responses = conn.execute(
-            """
-            SELECT id FROM interview_responses
-            WHERE session_id = ?
-            ORDER BY question_id
-            """,
-            (session_id,)
-        ).fetchall()
-        if response_index < 0 or response_index >= len(responses):
-            conn.close()
-            return jsonify({"status": "error", "message": "Invalid response index."}), 400
-        response_id = responses[response_index][0]
-    
-    # Update the response
-    conn.execute(
-        "UPDATE interview_responses SET response_text = ?, transcription = ? WHERE id = ?",
-        (response_text, response_text, response_id)
-    )
-    
-    # Instant keyword-based key points (no AI wait), then upgrade with AI
-    # quietly in the background so editing feels immediate.
-    user_id = session.get('user_id')
-    key_points = _keyword_key_points(response_text, user_id)
-    
-    conn.execute(
-        "UPDATE interview_responses SET key_points = ? WHERE id = ?",
-        (json.dumps(key_points), response_id)
-    )
-    
-    conn.commit()
-    conn.close()
-    
-    _reanalyze_key_points_background(response_id, response_text, user_id)
-    
-    logger.info(f"Response {response_index} updated successfully for session {session_id}")
-    return jsonify({"status": "success", "key_points": key_points})
-
-
-@app.route("/api/delete-response", methods=["POST"])
-@login_required
-def delete_response():
-    """Delete a response from an interview session.
-
-    Accepts `response_id` (preferred — exact row) or the legacy
-    `response_index` (position among the session's responses)."""
-    username = session.get('username', 'User')
-    data = request.json
-    session_id = data.get("session_id")
-    response_id = data.get("response_id")
-    response_index = data.get("response_index", 0)
-    
-    logger.info(f"User '{username}' deleting response for session {session_id}")
-    
-    conn = sqlite3.connect(DATABASE)
-    
-    # Privacy: only the creator can delete responses
-    creator_id = get_session_creator(conn, session_id)
-    if not can_manage_session(creator_id):
-        conn.close()
-        return jsonify({"status": "error", "message": "Only the creator of this interview can delete responses."}), 403
-    
-    if response_id is not None:
-        row = conn.execute(
-            "SELECT id FROM interview_responses WHERE id = ? AND session_id = ?",
-            (response_id, session_id)
-        ).fetchone()
-        if not row:
-            conn.close()
-            return jsonify({"status": "error", "message": "Response not found."}), 404
-        response_id = row[0]
-    else:
-        # Legacy index-based lookup (kept for backward compatibility)
-        responses = conn.execute(
-            """
-            SELECT id FROM interview_responses
-            WHERE session_id = ?
-            ORDER BY question_id
-            """,
-            (session_id,)
-        ).fetchall()
-        if response_index < 0 or response_index >= len(responses):
-            conn.close()
-            return jsonify({"status": "error", "message": "Invalid response index."}), 400
-        response_id = responses[response_index][0]
-    
-    # Delete the response
-    conn.execute("DELETE FROM interview_responses WHERE id = ?", (response_id,))
-    conn.commit()
-    conn.close()
-    
-    logger.info(f"Response {response_index} deleted successfully for session {session_id}")
-    return jsonify({"status": "success", "message": "Response deleted successfully."})
 
 
 @app.route("/interview/complete/<int:session_id>")
@@ -2013,15 +1633,13 @@ def interview_report(session_id):
     ).fetchone()
     responses = conn.execute(
         """
-        SELECT ir.id, iq.question_text, ir.response_text, ir.key_points, ir.respondent_name, ir.response_duration, ir.timestamp
+        SELECT iq.question_text, ir.response_text, ir.key_points
         FROM interview_responses ir
         JOIN interview_questions iq ON ir.question_id = iq.id
         WHERE ir.session_id = ?
-        ORDER BY ir.id
         """,
         (session_id,)
     ).fetchall()
-    can_manage = can_manage_session(get_session_creator(conn, session_id))
     conn.close()
     
     if not session_data:
@@ -2039,9 +1657,7 @@ def interview_report(session_id):
     grouped_by_question = []
     _current_question = None
     _current_responses = None
-    _respondent_name = None
-    _total_duration = 0
-    for _rid, _rq, _rt, _kp, _rn, _rd, _ts in responses:
+    for _rq, _rt, _kp in responses:
         if _current_question is None or _current_question != _rq:
             _current_question = _rq
             _current_responses = []
@@ -2050,11 +1666,7 @@ def interview_report(session_id):
             _points = json.loads(_kp) if _kp else []
         except (ValueError, TypeError):
             _points = []
-        _current_responses.append({'id': _rid, 'response': _rt or '', 'key_points': _points or []})
-        if _rn:
-            _respondent_name = _rn
-        if _rd:
-            _total_duration += _rd
+        _current_responses.append({'response': _rt or '', 'key_points': _points or []})
 
     recommendations = json.loads(report[8]) if report and report[8] else []
     if not recommendations:
@@ -2075,17 +1687,13 @@ def interview_report(session_id):
         'desired_features': desired_features,
         'recurring_issues': recurring_issues,
         'suggested_solutions': json.loads(report[7]) if report and report[7] else [],
-        'recommendations': recommendations,
-        'respondent_name': session_data[3] if session_data and session_data[3] else (_respondent_name or 'Unknown'),
-        'response_duration': _total_duration or 'N/A'
+        'recommendations': recommendations
     } if report else {'sdata': session_data, 'meta': session_meta(session_data), 'report': None,
                       'responses': responses, 'grouped_by_question': grouped_by_question,
                       'pain_points': [], 'desired_features': [], 'recurring_issues': [],
-                      'suggested_solutions': [], 'recommendations': [],
-                      'respondent_name': session_data[3] if session_data and session_data[3] else (_respondent_name or 'Unknown'),
-                      'response_duration': _total_duration or 'N/A'}
+                      'suggested_solutions': [], 'recommendations': []}
     
-    return render_template("interview_report.html", **report_data, can_manage=can_manage)
+    return render_template("interview_report.html", **report_data)
 
 
 @app.route("/interview/delete/<int:session_id>")
@@ -2674,7 +2282,7 @@ def settings_page():
             if len(data) > 4 * 1024 * 1024:
                 flash("Image is too large (maximum 4 MB).", "error")
                 return redirect(url_for('settings_page'))
-            save_dir = os.path.join(app.root_path, "static", "uploads", "avatars")
+            save_dir = os.path.join("static", "uploads", "avatars")
             os.makedirs(save_dir, exist_ok=True)
             # Unique filename every time: user id + ms timestamp + random suffix,
             # so replacing a picture always creates a NEW file (and removes the old one).
@@ -2686,7 +2294,7 @@ def settings_page():
             # can briefly hold a file lock right after a write or serve.}
             old = user[7] if len(user) > 7 else None
             if old:
-                _remove_file(os.path.join(app.root_path, "static", old))
+                _remove_file(os.path.join("static", old))
             conn = sqlite3.connect(DATABASE)
             conn.execute("UPDATE users SET profile_pic = ? WHERE id = ?",
                          (f"uploads/avatars/{filename}", user_id))
@@ -2699,7 +2307,7 @@ def settings_page():
         elif form_type == "avatar_remove":
             old = user[7] if len(user) > 7 else None
             if old:
-                _remove_file(os.path.join(app.root_path, "static", old))
+                _remove_file(os.path.join("static", old))
 
         elif form_type == "ai_api":
             # Gemini AI (real AI API) configuration — ADMIN ONLY, SYSTEM-WIDE.
@@ -2715,6 +2323,8 @@ def settings_page():
             saved_key = get_setting(0, "ai_api_key", "")
             if api_key:
                 set_setting(0, "ai_api_key", api_key)
+                # Reset circuit breaker when new key is saved
+                gemini_ai.reset_circuit_breaker()
             elif enabled == "1" and not saved_key:
                 set_setting(0, "ai_api_enabled", "0")
                 flash("No API key provided — Gemini AI stays disabled.", "error")
@@ -2726,6 +2336,11 @@ def settings_page():
             flash(f"Gemini AI settings saved for the WHOLE system! Gemini is now {state} for all accounts.", "success")
             return redirect(url_for('settings_page'))
     
+    defaults = {
+        'verifier_name': get_setting(user_id, "default_verifier_name", ""),
+        'verifier_role': get_setting(user_id, "default_verifier_role", username),
+        'question_count': get_setting(user_id, "default_question_count", "5"),
+    }
     ai = {
         'pain_keywords': get_setting(user_id, "ai_pain_keywords",
                                      "difficult, challenge, frustrat, problem, issue, slow, manual"),
@@ -2744,184 +2359,11 @@ def settings_page():
     }
     
     return render_template("settings.html", user=user, login_history=login_history,
-                           ai=ai, ai_api=ai_api, active='settings',
+                           defaults=defaults, ai=ai, ai_api=ai_api, active='settings',
                            is_admin=is_privileged_user())
 
 
-@app.route("/customer-support", methods=["GET", "POST"])
-@login_required
-def customer_support():
-    """Customer support page for submitting reports, suggestions, and feedback."""
-    username = session.get('username', 'User')
-    user_id = session.get('user_id')
-    
-    if request.method == "POST":
-        form_type = request.form.get("form_type")
-        
-        if form_type == "support_ticket":
-            category = request.form.get("category", "").strip()
-            subject = request.form.get("subject", "").strip()
-            message = request.form.get("message", "").strip()
-            priority = request.form.get("priority", "medium").strip()
-            
-            if not subject or not message:
-                flash("Please fill in all required fields.", "error")
-                return redirect(url_for('customer_support'))
-            
-            conn = sqlite3.connect(DATABASE)
-            conn.execute(
-                """
-                INSERT INTO support_tickets (user_id, username, category, subject, message, priority, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'open')
-                """,
-                (user_id, username, category, subject, message, priority)
-            )
-            conn.commit()
-            conn.close()
-            
-            logger.info(f"User '{username}' submitted support ticket: {subject} (priority: {priority})")
-            flash("Your issue has been reported successfully! We'll review it shortly.", "success")
-            session['support_success'] = 'ticket'
-            return redirect(url_for('customer_support'))
-        
-        elif form_type == "suggestion":
-            suggestion_type = request.form.get("suggestion_type", "").strip()
-            suggestion_title = request.form.get("suggestion_title", "").strip()
-            suggestion = request.form.get("suggestion", "").strip()
-            benefit = request.form.get("benefit", "my_role").strip()
-            
-            if not suggestion:
-                flash("Please enter your suggestion.", "error")
-                return redirect(url_for('customer_support'))
-            
-            conn = sqlite3.connect(DATABASE)
-            conn.execute(
-                """
-                INSERT INTO system_suggestions (user_id, username, suggestion_type, suggestion_title, suggestion, benefit, status)
-                VALUES (?, ?, ?, ?, ?, ?, 'pending')
-                """,
-                (user_id, username, suggestion_type, suggestion_title, suggestion, benefit)
-            )
-            conn.commit()
-            conn.close()
-            
-            logger.info(f"User '{username}' submitted suggestion: {suggestion_title or suggestion_type}")
-            flash("Thank you for your suggestion! We appreciate your feedback.", "success")
-            session['support_success'] = 'suggestion'
-            return redirect(url_for('customer_support'))
-    
-    # Get user's previous tickets and suggestions
-    success_kind = session.pop('support_success', None)
-    conn = sqlite3.connect(DATABASE)
-    tickets = conn.execute(
-        "SELECT * FROM support_tickets WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
-        (user_id,)
-    ).fetchall()
-    suggestions = conn.execute(
-        "SELECT * FROM system_suggestions WHERE user_id = ? ORDER BY created_at DESC LIMIT 10",
-        (user_id,)
-    ).fetchall()
-    conn.close()
-    
-    return render_template("customer_support.html", tickets=tickets, suggestions=suggestions,
-                          active='support', success_kind=success_kind)
-
-
-
-@app.route("/dean-staffs")
-@login_required
-def dean_staffs():
-    """Dean and Staffs page for viewing all reports, tickets, and suggestions."""
-    user_id = session.get('user_id')
-    
-    # Get all support tickets
-    conn = sqlite3.connect(DATABASE)
-    tickets = conn.execute("""
-        SELECT id, username, category, subject, message, priority, status, created_at
-        FROM support_tickets
-        ORDER BY created_at DESC
-    """).fetchall()
-    
-    # Get all suggestions
-    suggestions = conn.execute("""
-        SELECT id, username, suggestion_type, suggestion_title, suggestion, benefit, status, created_at
-        FROM system_suggestions
-        ORDER BY created_at DESC
-    """).fetchall()
-    
-    # Get all interview reports
-    reports = conn.execute("""
-        SELECT r.id, COALESCE(s.title, 'Untitled Interview') AS title, r.generated_at AS created_at
-        FROM interview_reports r
-        LEFT JOIN interview_sessions s ON s.id = r.session_id
-        ORDER BY r.generated_at DESC
-    """).fetchall()
-    
-    # Get Dean & Staff member directory (everyone except student/applicant accounts)
-    staff_members = conn.execute("""
-        SELECT id, username, email, role, profile_pic, created_at, account_code
-        FROM users
-        WHERE role IS NOT NULL AND role != ''
-              AND LOWER(role) NOT IN ('student', 'applicant')
-        ORDER BY CASE WHEN role = 'Dean' THEN 0 ELSE 1 END, username ASC
-    """).fetchall()
-
-    conn.close()
-    
-    return render_template("dean_staffs.html", tickets=tickets, suggestions=suggestions,
-                          reports=reports, staff_members=staff_members, active='dean_staffs')
-
-
-@app.route("/dean-staffs/clear-ticket/<int:ticket_id>", methods=["POST"])
-@login_required
-def clear_ticket(ticket_id):
-    """Delete a support ticket."""
-    conn = sqlite3.connect(DATABASE)
-    conn.execute("DELETE FROM support_tickets WHERE id = ?", (ticket_id,))
-    conn.commit()
-    conn.close()
-    flash("Ticket deleted successfully.", "success")
-    return redirect(url_for('dean_staffs'))
-
-
-@app.route("/dean-staffs/clear-suggestion/<int:suggestion_id>", methods=["POST"])
-@login_required
-def clear_suggestion(suggestion_id):
-    """Delete a suggestion."""
-    conn = sqlite3.connect(DATABASE)
-    conn.execute("DELETE FROM system_suggestions WHERE id = ?", (suggestion_id,))
-    conn.commit()
-    conn.close()
-    flash("Suggestion deleted successfully.", "success")
-    return redirect(url_for('dean_staffs'))
-
-
-@app.route("/dean-staffs/clear-all-tickets", methods=["POST"])
-@login_required
-def clear_all_tickets():
-    """Delete all support tickets."""
-    conn = sqlite3.connect(DATABASE)
-    conn.execute("DELETE FROM support_tickets")
-    conn.commit()
-    conn.close()
-    flash("All tickets cleared successfully.", "success")
-    return redirect(url_for('dean_staffs'))
-
-
-@app.route("/dean-staffs/clear-all-suggestions", methods=["POST"])
-@login_required
-def clear_all_suggestions():
-    """Delete all suggestions."""
-    conn = sqlite3.connect(DATABASE)
-    conn.execute("DELETE FROM system_suggestions")
-    conn.commit()
-    conn.close()
-    flash("All suggestions cleared successfully.", "success")
-    return redirect(url_for('dean_staffs'))
-
-
 @app.route("/settings/test-ai", methods=["POST"])
-
 @login_required
 def test_ai_connection():
     """AJAX endpoint: test the Gemini API connection with the form's key (or the saved one)."""
@@ -2932,6 +2374,9 @@ def test_ai_connection():
         or get_setting(0, "ai_model", "") or get_setting(user_id, "ai_model", "") \
         or gemini_ai.DEFAULT_MODEL
     ok, message = gemini_ai.test_connection(api_key=api_key, model=model)
+    if ok:
+        # Reset circuit breaker on successful connection
+        gemini_ai.reset_circuit_breaker()
     logger.info(f"User '{session.get('username', 'User')}' tested Gemini connection: "
                 f"{'OK' if ok else message}")
     return jsonify({"ok": ok, "message": message})
@@ -3075,24 +2520,6 @@ def export_backup():
         return redirect(url_for('settings_page'))
 
 
-@app.route("/healthz")
-def healthz():
-    """Lightweight health check for hosting platforms (Render, etc.)."""
-    return jsonify(status="ok"), 200
-
-
-# Initialize the database at import time so production servers
-# (gunicorn runs `app:app` and never executes the __main__ block below)
-# still get all tables on first boot. Safe to run repeatedly
-# (CREATE TABLE IF NOT EXISTS + guarded migrations).
-try:
-    init_db()
-except Exception as _init_exc:  # never crash the import on a read-only FS
-    logger.warning(f"Database auto-init skipped: {_init_exc}")
-
-
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)),
-            debug=os.environ.get("FLASK_DEBUG", "1") == "1")
-
+    app.run(debug=True)
