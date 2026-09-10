@@ -33,6 +33,7 @@ DATABASE = "data.db"
 # Unified stakeholder categories used for account registration, login
 # authentication ("Login as"), interview participant roles, and session grouping.
 USER_CATEGORIES = [
+    "Owner/Admin",
     "Student",
     "Faculty",
     "Applicant",
@@ -59,6 +60,7 @@ CATEGORY_DISPLAY_MAP = {
 # logged in may VIEW all sessions and data. Registration itself stays open
 # (no limit on creating accounts).
 PRIVILEGED_CATEGORIES = {
+    "Owner/Admin",
     "Dean",
     "Faculty",
     "Staff Employee",
@@ -1226,7 +1228,7 @@ def new_interview():
         
         logger.info(f"Interview session {session_id} created with {len(questions)} questions")
         # Send the admin straight to AI Question Setup to review the generated set.
-        return redirect(f"/interview/setup/{session_id}")
+        return redirect(f"/interview/setup/{session_id}#questionsCard")
     
     # Pre-fill default question count saved in Settings
     default_q = get_setting(user_id, "default_question_count", "5")
@@ -1255,18 +1257,32 @@ def interview_setup(session_id):
         return redirect("/interviews")
 
     can_manage = can_manage_session(get_session_creator(conn, session_id))
-    questions = conn.execute(
+    all_questions = conn.execute(
         "SELECT * FROM interview_questions WHERE session_id = ? ORDER BY id", (session_id,)
     ).fetchall()
     conn.close()
 
     meta = session_meta(session_data)
     if not meta['num_questions'] or meta['num_questions'] <= 0:
-        meta['num_questions'] = len(questions) or 5
+        meta['num_questions'] = len(all_questions) or 5
+
+    # Pagination for the question editor (interview_setup.html shows the set in
+    # pages of `per_page` questions, preserving the ?page=N links in the page).
+    per_page = 5
+    total_questions = len(all_questions)
+    total_pages = max(1, (total_questions + per_page - 1) // per_page) if total_questions else 1
+    try:
+        page = int(request.args.get("page", 1))
+    except (TypeError, ValueError):
+        page = 1
+    page = max(1, min(page, total_pages))
+    questions = all_questions[(page - 1) * per_page: page * per_page]
 
     logger.info(f"User '{username}' opened AI Question Setup for session {session_id}")
     return render_template("interview_setup.html", sdata=session_data, meta=meta,
                            questions=questions, can_manage=can_manage,
+                           page=page, per_page=per_page,
+                           total_questions=total_questions, total_pages=total_pages,
                            is_privileged=is_privileged_user(), active='setup')
 
 
@@ -1306,7 +1322,7 @@ def regenerate_questions(session_id):
     if not can_manage_session(get_session_creator(conn, session_id)):
         conn.close()
         flash("Only the creator or staff can regenerate the question set.", "error")
-        return redirect(f"/interview/setup/{session_id}")
+        return redirect(f"/interview/setup/{session_id}#questionsCard")
 
     meta = session_meta(session_data)
     qty = meta.get('num_questions')
@@ -1323,7 +1339,7 @@ def regenerate_questions(session_id):
     conn.close()
     logger.info(f"Question set regenerated for session {session_id} ({len(questions)} questions) by '{username}'")
     flash(f"AI regenerated a new {len(questions)}-question set. Review and save before starting.", "success")
-    return redirect(f"/interview/setup/{session_id}")
+    return redirect(f"/interview/setup/{session_id}#questionsCard")
 
 
 @app.route("/interview/update-session/<int:session_id>", methods=["POST"])
@@ -1342,7 +1358,7 @@ def update_session_details(session_id):
     if not can_manage_session(get_session_creator(conn, session_id)):
         conn.close()
         flash("Only the creator or staff can update this interview.", "error")
-        return redirect(f"/interview/setup/{session_id}")
+        return redirect(f"/interview/setup/{session_id}#questionsCard")
 
     def _clamp(val, minimum, maximum, fallback):
         try:
@@ -1379,7 +1395,7 @@ def update_session_details(session_id):
     conn.close()
     logger.info(f"Session {session_id} details updated by '{username}' ({num_questions} questions)")
     flash(f"Interview details saved ({generated} questions in the official set).", "success")
-    return redirect(f"/interview/setup/{session_id}")
+    return redirect(f"/interview/setup/{session_id}#questionsCard")
 
 
 @app.route("/interview/update-questions/<int:session_id>", methods=["POST"])
@@ -1398,7 +1414,7 @@ def update_question_set(session_id):
     if not can_manage_session(get_session_creator(conn, session_id)):
         conn.close()
         flash("Only the creator or staff can edit the question set.", "error")
-        return redirect(f"/interview/setup/{session_id}")
+        return redirect(f"/interview/setup/{session_id}#questionsCard")
 
     question_ids = request.form.getlist("question_ids")
     saved = 0
@@ -1415,7 +1431,7 @@ def update_question_set(session_id):
     conn.close()
     logger.info(f"Official question set saved for session {session_id} ({saved} questions) by '{username}'")
     flash("Question set saved. Every respondent will answer exactly these questions.", "success")
-    return redirect(f"/interview/setup/{session_id}")
+    return redirect(f"/interview/setup/{session_id}#questionsCard")
 
 
 @app.route("/interview/prepare/<int:session_id>")
