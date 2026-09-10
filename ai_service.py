@@ -801,6 +801,8 @@ def _gemini_questions(system_type: str, user_role: str, max_questions: int, gemi
     """AI-generate interview questions. Returns list of {text, category} or None."""
     try:
         count = max_questions if (max_questions and max_questions > 0) else 6
+        # Calculate tokens needed: ~25 tokens per question + overhead for JSON structure
+        tokens_needed = max(2048, count * 30 + 500)
         context_line = ""
         if extra_context and str(extra_context).strip():
             context_line = f"- Interview context: {str(extra_context).strip()}\n"
@@ -808,15 +810,17 @@ def _gemini_questions(system_type: str, user_role: str, max_questions: int, gemi
 
 Context:
 - System being studied: {str(system_type).replace('_', ' ')}
-- Interviewee role: {str(user_role).replace('_', ' ')}
+- Stakeholder role: {str(user_role).replace('_', ' ')}
 {context_line}
-Generate exactly {count} open-ended interview questions about how the interviewee uses this system, the challenges they face, and what improvements they want. Return ONLY {count} questions. Questions must be easy to understand and answerable by a non-technical person.
+IMPORTANT: Generate exactly {count} open-ended interview questions SPECIFICALLY tailored for a "{str(user_role).replace('_', ' ')}". The questions must be relevant to their daily work, challenges, and experiences in their role.
+
+Topics to cover: how they use the system, challenges they face, desired improvements, workflows, pain points, goals, and suggestions. Return ONLY {count} questions. Questions must be easy to understand and answerable by a non-technical person.
 
 Each question must have a "category" chosen from exactly one of: personal_info, goals, challenges, preferences, suggestions, pain_points, workflows, desired_features, context.
 
 Respond with ONLY a JSON array, no extra text, in this exact format:
 [{{"text": "Question text here?", "category": "pain_points"}}]"""
-        raw = gemini_ai.call_gemini(prompt, api_key=gemini_cfg["api_key"], model=gemini_cfg.get("model"))
+        raw = gemini_ai.call_gemini(prompt, api_key=gemini_cfg["api_key"], model=gemini_cfg.get("model"), max_output_tokens=tokens_needed)
         data = gemini_ai.parse_json_block(raw)
         if not isinstance(data, list):
             return None

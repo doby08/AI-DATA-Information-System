@@ -31,7 +31,7 @@ SUGGESTED_MODELS = [
     "gemini-2.5-flash",     # legacy (still works, previous generation)
 ]
 REQUEST_TIMEOUT = 30      # seconds for normal AI calls
-MAX_OUTPUT_TOKENS = 2048
+MAX_OUTPUT_TOKENS = 4096
 
 # ---- Circuit breaker: after repeated failures, pause AI calls for a while ----
 _consecutive_failures = 0

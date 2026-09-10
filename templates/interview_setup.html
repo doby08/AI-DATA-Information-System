@@ -37,7 +37,7 @@
         <div class="card">
             <div class="card-title">
                 <span>{{ icon('brain') }} AI-Generated Questions</span>
-                <span class="badge badge-cyan">{{ questions|length }} questions</span>
+                <span class="badge badge-cyan">{{ total_questions }} questions</span>
             </div>
             <div class="card-head-sub">This is the official question set. Every respondent in this session will answer
                 exactly these questions &mdash; the set is saved once and never regenerated per respondent.</div>
@@ -45,9 +45,13 @@
             {% if can_manage %}
             <form method="POST" action="/interview/update-questions/{{ sdata[0] }}" id="questionsForm">
                 {% if questions %}
+                <div class="pagination-info" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:8px 12px; background:var(--bg-2); border-radius:6px;">
+                    <span class="text-sm muted">Showing Q{{ (page-1)*per_page+1 }}–{{ [page*per_page, total_questions]|min }} of {{ total_questions }} questions</span>
+                    <span class="badge badge-cyan">Page {{ page }} of {{ total_pages }}</span>
+                </div>
                 {% for q in questions %}
                 <div class="question-item">
-                    <div class="q-head"><span class="question-num">Q{{ loop.index }}</span><span class="question-category">{{ q[5] or 'context' }}</span>
+                    <div class="q-head"><span class="question-num">Q{{ (page-1)*per_page + loop.index }}</span><span class="question-category">{{ q[5] or 'context' }}</span>
                         <label class="q-remove" title="Remove this question from the set">
                             <input type="checkbox" name="remove_question_ids" value="{{ q[0] }}">
                             <span class="text-sm">Remove</span>
@@ -55,10 +59,33 @@
                     </div>
                     <div class="q-edit">
                         <input type="hidden" name="question_ids" value="{{ q[0] }}">
-                        <textarea name="question_{{ q[0] }}" rows="2" aria-label="Question {{ loop.index }}">{{ q[2] }}</textarea>
+                        <textarea name="question_{{ q[0] }}" rows="2" aria-label="Question {{ (page-1)*per_page + loop.index }}">{{ q[2] }}</textarea>
                     </div>
                 </div>
                 {% endfor %}
+                {% if total_pages > 1 %}
+                <div class="pagination-controls" style="display:flex; justify-content:center; align-items:center; gap:10px; margin-top:16px; padding-top:12px; border-top:1px solid var(--line);">
+                    {% if page > 1 %}
+                    <a href="?page={{ page-1 }}" class="btn btn-outline btn-sm">← Back</a>
+                    {% else %}
+                    <button class="btn btn-outline btn-sm" disabled>← Back</button>
+                    {% endif %}
+                    <div style="display:flex; gap:4px;">
+                        {% for p in range(1, total_pages+1) %}
+                        {% if p == page %}
+                        <span class="btn btn-primary btn-sm" style="min-width:36px;">{{ p }}</span>
+                        {% else %}
+                        <a href="?page={{ p }}" class="btn btn-outline btn-sm" style="min-width:36px;">{{ p }}</a>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% if page < total_pages %}
+                    <a href="?page={{ page+1 }}" class="btn btn-outline btn-sm">Next →</a>
+                    {% else %}
+                    <button class="btn btn-outline btn-sm" disabled>Next →</button>
+                    {% endif %}
+                </div>
+                {% endif %}
                 <div class="flex" style="justify-content:flex-end; gap:10px; margin-top:16px;">
                     <button type="submit" class="btn btn-primary">{{ icon('save') }} Save Question Set</button>
                 </div>
@@ -68,12 +95,39 @@
             </form>
             {% else %}
                 {% if questions %}
+                <div class="pagination-info" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:8px 12px; background:var(--bg-2); border-radius:6px;">
+                    <span class="text-sm muted">Showing Q{{ (page-1)*per_page+1 }}–{{ [page*per_page, total_questions]|min }} of {{ total_questions }} questions</span>
+                    <span class="badge badge-cyan">Page {{ page }} of {{ total_pages }}</span>
+                </div>
                 {% for q in questions %}
                 <div class="question-item">
-                    <div class="q-head"><span class="question-num">Q{{ loop.index }}</span><span class="question-category">{{ q[5] or 'context' }}</span></div>
+                    <div class="q-head"><span class="question-num">Q{{ (page-1)*per_page + loop.index }}</span><span class="question-category">{{ q[5] or 'context' }}</span></div>
                     <div class="question-text">{{ q[2] }}</div>
                 </div>
                 {% endfor %}
+                {% if total_pages > 1 %}
+                <div class="pagination-controls" style="display:flex; justify-content:center; align-items:center; gap:10px; margin-top:16px; padding-top:12px; border-top:1px solid var(--line);">
+                    {% if page > 1 %}
+                    <a href="?page={{ page-1 }}" class="btn btn-outline btn-sm">← Back</a>
+                    {% else %}
+                    <button class="btn btn-outline btn-sm" disabled>← Back</button>
+                    {% endif %}
+                    <div style="display:flex; gap:4px;">
+                        {% for p in range(1, total_pages+1) %}
+                        {% if p == page %}
+                        <span class="btn btn-primary btn-sm" style="min-width:36px;">{{ p }}</span>
+                        {% else %}
+                        <a href="?page={{ p }}" class="btn btn-outline btn-sm" style="min-width:36px;">{{ p }}</a>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% if page < total_pages %}
+                    <a href="?page={{ page+1 }}" class="btn btn-outline btn-sm">Next →</a>
+                    {% else %}
+                    <button class="btn btn-outline btn-sm" disabled>Next →</button>
+                    {% endif %}
+                </div>
+                {% endif %}
                 <div class="info-note">{{ icon('lock') }} <span>Only the creator or staff can edit this question set.</span></div>
                 {% else %}
                 <div class="empty"><div class="empty-ico">{{ icon('brain') }}</div>No questions have been generated for this session yet.</div>

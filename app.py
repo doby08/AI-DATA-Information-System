@@ -1437,10 +1437,24 @@ def interview_setup(session_id):
     if not meta['num_questions'] or meta['num_questions'] <= 0:
         meta['num_questions'] = len(questions) or 5
 
+    # Pagination: 10 questions per page
+    per_page = 10
+    total_questions = len(questions)
+    total_pages = max(1, (total_questions + per_page - 1) // per_page)
+    page = request.args.get('page', 1, type=int)
+    page = max(1, min(page, total_pages))
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_questions = questions[start_idx:end_idx]
+
     logger.info(f"User '{username}' opened AI Question Setup for session {session_id}")
     return render_template("interview_setup.html", sdata=session_data, meta=meta,
-                           questions=questions, can_manage=can_manage,
-                           is_privileged=is_privileged_user(), active='setup')
+                           questions=paginated_questions, all_questions=questions,
+                           can_manage=can_manage,
+                           is_privileged=is_privileged_user(), active='setup',
+                           page=page, total_pages=total_pages,
+                           total_questions=total_questions,
+                           per_page=per_page)
 
 
 def _rebuild_question_set(conn, session_id, meta, qty):
