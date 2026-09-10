@@ -294,26 +294,57 @@ def generate_interview_questions(system_type: str, user_role: str, max_questions
 def get_generic_questions() -> list:
     """Return generic interview questions for any system."""
     return [
-        {
-            "text": "What is your primary role with this system?",
-            "category": "context"
-        },
-        {
-            "text": "What are the main challenges you face?",
-            "category": "pain_points"
-        },
-        {
-            "text": "What features would be most valuable?",
-            "category": "desired_features"
-        },
-        {
-            "text": "How much time do you spend on this system daily?",
-            "category": "workflows"
-        },
-        {
-            "text": "What improvements would have the most impact?",
-            "category": "desired_features"
-        }
+        {"text": "What is your primary role with this system?", "category": "context"},
+        {"text": "What are the main challenges you face?", "category": "pain_points"},
+        {"text": "What features would be most valuable?", "category": "desired_features"},
+        {"text": "How much time do you spend on this system daily?", "category": "workflows"},
+        {"text": "What improvements would have the most impact?", "category": "desired_features"},
+        {"text": "How did you first learn about this system?", "category": "context"},
+        {"text": "What do you like most about the current system?", "category": "preferences"},
+        {"text": "What do you like least about the current system?", "category": "pain_points"},
+        {"text": "How does this system affect your daily workflow?", "category": "workflows"},
+        {"text": "What training or support did you receive?", "category": "context"},
+        {"text": "What additional training would help you?", "category": "suggestions"},
+        {"text": "How reliable is the system in your experience?", "category": "challenges"},
+        {"text": "What workarounds have you developed?", "category": "workflows"},
+        {"text": "What information do you need that is hard to find?", "category": "pain_points"},
+        {"text": "How could communication be improved?", "category": "suggestions"},
+        {"text": "What are your goals when using this system?", "category": "goals"},
+        {"text": "How does the system compare to alternatives you have used?", "category": "preferences"},
+        {"text": "What security or privacy concerns do you have?", "category": "challenges"},
+        {"text": "What reporting features do you need?", "category": "desired_features"},
+        {"text": "What would make your job easier?", "category": "suggestions"},
+        {"text": "How do you currently solve problems with the system?", "category": "workflows"},
+        {"text": "What feedback have you given before?", "category": "context"},
+        {"text": "How could the system be more accessible?", "category": "suggestions"},
+        {"text": "What integrations with other tools would help?", "category": "desired_features"},
+        {"text": "What is your biggest frustration?", "category": "pain_points"},
+        {"text": "How do you measure success with this system?", "category": "goals"},
+        {"text": "What support resources do you wish existed?", "category": "suggestions"},
+        {"text": "How has the system changed how you work?", "category": "workflows"},
+        {"text": "What would you tell the developers?", "category": "suggestions"},
+        {"text": "What future improvements are you hoping for?", "category": "desired_features"},
+        {"text": "How well does the system meet your needs today?", "category": "goals"},
+        {"text": "What manual processes would you automate?", "category": "suggestions"},
+        {"text": "How do errors or downtime affect your work?", "category": "pain_points"},
+        {"text": "What data or analytics would help you?", "category": "desired_features"},
+        {"text": "How could onboarding new users be improved?", "category": "suggestions"},
+        {"text": "What collaboration features do you need?", "category": "desired_features"},
+        {"text": "How do you share information with colleagues?", "category": "workflows"},
+        {"text": "What compliance or policy issues affect you?", "category": "challenges"},
+        {"text": "What mobile or remote access do you need?", "category": "desired_features"},
+        {"text": "How could notifications be improved?", "category": "suggestions"},
+        {"text": "What customization options would you value?", "category": "preferences"},
+        {"text": "How do you handle peak usage times?", "category": "workflows"},
+        {"text": "What backup or recovery options do you need?", "category": "desired_features"},
+        {"text": "How could search be improved?", "category": "suggestions"},
+        {"text": "What accessibility features matter to you?", "category": "desired_features"},
+        {"text": "How could the interface be simplified?", "category": "suggestions"},
+        {"text": "What is missing from the current system?", "category": "desired_features"},
+        {"text": "How do you prioritize your tasks with this system?", "category": "workflows"},
+        {"text": "What performance issues have you noticed?", "category": "pain_points"},
+        {"text": "How could reporting be streamlined?", "category": "suggestions"},
+        {"text": "What other stakeholders should be involved?", "category": "context"}
     ]
 
 

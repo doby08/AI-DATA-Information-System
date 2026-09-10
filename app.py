@@ -1338,16 +1338,7 @@ def new_interview():
     
     if request.method == "POST":
         title = request.form["title"]
-        user_role = request.form["user_role"]
-        verifier_name = request.form.get("verifier_name", "").strip()
-        verifier_department = request.form.get("verifier_department", "").strip()
-        verifier_date = request.form.get("verifier_date", "")
-        verifier_time = request.form.get("verifier_time", "")
-
-        # Unified stakeholder categories ... AI Question Setup fields.
-        # The number of questions is configured HERE by the admin and stored on
-        # the session, so all respondents answer exactly the same question set.
-        interview_objectives = request.form.get("interview_objectives", "").strip()
+        user_role = request.form["user_role"].strip()
         additional_instructions = request.form.get("additional_instructions", "").strip()
         try:
             num_respondents = max(1, int(request.form.get("num_respondents", "1") or 1))
@@ -1359,22 +1350,21 @@ def new_interview():
             num_questions = 0
         if num_questions <= 0:
             num_questions = int(get_setting(user_id, "default_question_count", "5") or 5)
-        num_questions = max(1, min(15, num_questions))
+        num_questions = max(1, min(50, num_questions))
         num_respondents = max(1, min(999, num_respondents))
 
         logger.info(f"User '{username}' creating new interview session: {title}")
-        logger.info(f"Interview role: {user_role}, Verifier: {verifier_name}, Date: {verifier_date}, Time: {verifier_time}")
+        logger.info(f"Interview role: {user_role}, Questions: {num_questions}")
 
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
         
         cursor.execute(
             """
-            INSERT INTO interview_sessions (title, user_role, verifier_name, verifier_date, verifier_time, status, created_by, verifier_department, num_respondents, num_questions, interview_objectives, additional_instructions)
-            VALUES (?, ?, ?, ?, ?, 'planning', ?, ?, ?, ?, ?, ?)
+            INSERT INTO interview_sessions (title, user_role, verifier_name, verifier_date, verifier_time, status, created_by, verifier_department, num_respondents, num_questions, additional_instructions)
+            VALUES (?, ?, '', '', '', 'planning', ?, '', ?, ?, ?)
             """,
-            (title, user_role, verifier_name, verifier_date, verifier_time, user_id, verifier_department,
-             num_respondents, num_questions, interview_objectives, additional_instructions)
+            (title, user_role, user_id, num_respondents, num_questions, additional_instructions)
         )
         conn.commit()
         session_id = cursor.lastrowid
@@ -1388,13 +1378,12 @@ def new_interview():
         # question set is generated ONCE during setup and saved to the database,
         # so every respondent in this interview answers the SAME questions and
         # their responses can be compared and analyzed.
-        topics = title
-        if interview_objectives:
-            topics = f"{title}. Objectives: {interview_objectives}"
+        # The AI uses the interview title and stakeholder role to generate relevant questions.
+        extra_context = f"{title}. Stakeholder role: {user_role}"
         questions = generate_interview_questions("basic_gathering", user_role,
                                                  max_questions=num_questions,
                                                  gemini_cfg=build_gemini_cfg(user_id),
-                                                 extra_context=topics)
+                                                 extra_context=extra_context)
         
         for question in questions:
             conn.execute(
@@ -1414,12 +1403,9 @@ def new_interview():
     
     # Pre-fill defaults saved in Settings
     defaults = {
-        'verifier_name': get_setting(user_id, "default_verifier_name", ""),
-        'verifier_role': get_setting(user_id, "default_verifier_role", username),
         'num_questions': get_setting(user_id, "default_question_count", "5"),
     }
-    return render_template("interview_new.html", defaults=defaults, categories=USER_CATEGORIES,
-                           active='setup')
+    return render_template("interview_new.html", defaults=defaults, active='setup')
 
 
 # ============ AI QUESTION SETUP ============
@@ -1462,15 +1448,15 @@ def interview_setup(session_id):
 def _rebuild_question_set(conn, session_id, meta, qty):
     """Delete the current questions and generate a fresh set of exactly `qty`
     questions for the session (single source of truth for the session)."""
-    topics = meta.get('title') or "Interview"
-    if meta.get('objectives'):
-        topics = f"{topics}. Objectives: {meta['objectives']}"
+    title = meta.get('title') or "Interview"
+    role = meta.get('role') or "Stakeholder"
+    extra_context = f"{title}. Stakeholder role: {role}"
     conn.execute("DELETE FROM interview_questions WHERE session_id = ?", (session_id,))
     questions = generate_interview_questions(
-        "basic_gathering", meta.get('role') or "Stakeholder",
+        "basic_gathering", role,
         max_questions=qty,
         gemini_cfg=build_gemini_cfg(session.get('user_id')),
-        extra_context=topics)
+        extra_context=extra_context)
     for question in questions:
         conn.execute(
             "INSERT INTO interview_questions (session_id, question_text, category, suggested_by) VALUES (?, ?, ?, 'ai')",
@@ -1501,11 +1487,11 @@ def regenerate_questions(session_id):
     qty = meta.get('num_questions')
     if not qty or qty <= 0:
         qty = int(request.form.get("num_questions", 5) or 5)
-        qty = max(1, min(15, qty))
+        qty = max(1, min(50, qty))
         conn.execute("UPDATE interview_sessions SET num_questions = ? WHERE id = ?", (qty, session_id))
         conn.commit()
     else:
-        qty = max(1, min(15, int(qty)))
+        qty = max(1, min(50, int(qty)))
 
     questions = _rebuild_question_set(conn, session_id, meta, qty)
     conn.commit()
@@ -1540,16 +1526,15 @@ def update_session_details(session_id):
             return fallback
 
     num_respondents = _clamp(request.form.get("num_respondents"), 1, 999, 1)
-    num_questions = _clamp(request.form.get("num_questions"), 1, 15, 5)
-    objectives = (request.form.get("interview_objectives") or "").strip()
+    num_questions = _clamp(request.form.get("num_questions"), 1, 50, 5)
     instructions = (request.form.get("additional_instructions") or "").strip()
 
     conn.execute(
         """UPDATE interview_sessions
            SET num_respondents = ?, num_questions = ?,
-               interview_objectives = ?, additional_instructions = ?
+               additional_instructions = ?
            WHERE id = ?""",
-        (num_respondents, num_questions, objectives, instructions, session_id)
+        (num_respondents, num_questions, instructions, session_id)
     )
 
     # Keep the question set in sync with the configured count: if the admin

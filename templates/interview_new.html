@@ -34,60 +34,25 @@
                 </div>
                 <div class="form-group">
                     <label for="user_role">Stakeholder Role <span class="required">*</span></label>
-                    <select id="user_role" name="user_role" required>
-                        <option value="">— Select category —</option>
-                        {% for cat in categories %}
-                        <option value="{{ cat }}">{{ cat }}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-hint">Sessions are grouped by category in the Interview History.</div>
+                    <input type="text" id="user_role" name="user_role" placeholder="e.g., Doctor, Teacher, Farmer, Student, Nurse" required>
+                    <div class="form-hint">Type the role of the stakeholder being interviewed. The AI uses this to generate relevant questions.</div>
                 </div>
             </div>
 
             <div class="form-row">
+                <div class="form-group">
+                    <label for="num_questions">Number of Questions <span class="required">*</span></label>
+                    <input type="number" id="num_questions" name="num_questions" min="1" max="50" value="{{ defaults.num_questions if defaults else 5 }}" required>
+                    <div class="form-hint">AI will generate exactly this many questions — type any number (e.g., 50) and the AI will generate exactly that many.</div>
+                </div>
                 <div class="form-group">
                     <label for="num_respondents">Number of Respondents</label>
                     <input type="number" id="num_respondents" name="num_respondents" min="1" max="999" value="1" required>
                     <div class="form-hint">How many interviewees will answer this session.</div>
                 </div>
-                <div class="form-group">
-                    <label for="num_questions">Number of Questions</label>
-                    <input type="number" id="num_questions" name="num_questions" min="1" max="15" value="{{ defaults.num_questions if defaults else 5 }}" required>
-                    <div class="form-hint">AI will generate exactly this many questions — every respondent answers the same set.</div>
-                </div>
             </div>
 
-            <div class="form-group">
-                <label for="interview_objectives">Interview Objectives</label>
-                <textarea id="interview_objectives" name="interview_objectives" rows="2"
-                          placeholder="e.g., Gather requirements and identify pain points in the current Student Learning System."></textarea>
-                <div class="form-hint">The AI uses the title, role, and objectives to generate relevant questions.</div>
-            </div>
-
-            <div class="divider"></div>
-
-            <div class="card-title" style="font-size:13px; margin-bottom:12px;"><span>{{ icon('check') }} Verification Details</span></div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="verifier_name">Full Name of Respondent <span class="required">*</span></label>
-                    <input type="text" id="verifier_name" name="verifier_name" value="{{ defaults.verifier_name if defaults else '' }}" placeholder="Enter the full name of the respondent" required>
-                </div>
-                <div class="form-group">
-                    <label for="verifier_department">Department / College / Office</label>
-                    <input type="text" id="verifier_department" name="verifier_department" value="{{ defaults.verifier_department if defaults and defaults.verifier_department else '' }}" placeholder="e.g., College of Engineering, Registrar Office">
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="verifier_date">Interview Date <span class="required">*</span></label>
-                    <input type="date" id="verifier_date" name="verifier_date" required>
-                </div>
-                <div class="form-group">
-                    <label for="verifier_time">Interview Time <span class="required">*</span></label>
-                    <input type="time" id="verifier_time" name="verifier_time" required>
-                </div>
-            </div>
-<div class="form-group mt-3">
+            <div class="form-group mt-3">
                 <label for="additional_instructions">Additional Instructions (optional)</label>
                 <textarea id="additional_instructions" name="additional_instructions" rows="2"
                           placeholder="Anything the interviewer should keep in mind during the session."></textarea>
@@ -105,17 +70,16 @@
         <div class="card mb-3">
             <div class="card-title" style="font-size:13px;"><span>{{ icon('brain') }} How it works</span></div>
             <ol style="padding-left:18px; color:var(--muted); font-size:12.5px; line-height:1.9;">
-                <li>Fill in the interview details and the <strong>question count</strong>.</li>
-                <li>Click <strong>Generate AI Questions</strong> — the AI drafts exactly that many questions.</li>
+                <li>Enter the <strong>Interview Title</strong> and type the <strong>Stakeholder Role</strong> (e.g., Doctor, Teacher, Farmer).</li>
+                <li>Set the <strong>Number of Questions</strong> — the AI generates exactly that many questions.</li>
+                <li>Click <strong>Generate AI Questions</strong> — the AI drafts questions based on the title and stakeholder role.</li>
                 <li>Review, edit, or regenerate the question set.</li>
-                <li>Save the set — it becomes the official set for the session.</li>
                 <li>Conduct the session; every respondent answers the same questions.</li>
             </ol>
         </div>
         <div class="warn-note" style="margin-bottom:0;">
             {{ icon('lock') }}
-            <span>Question count is configured by the administrator (Dean / staff) during setup. Respondents can only
-            answer the questions assigned to their session.</span>
+            <span>Question count is configured during setup. The AI generates exactly the number of questions you specify.</span>
         </div>
     </div>
 </div>

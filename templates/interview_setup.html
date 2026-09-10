@@ -31,7 +31,7 @@
                 <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Configured set</div><div class="kpi-num" style="font-size:26px;">{{ meta.num_questions }}</div></div>
                 <div class="kpi" style="padding:14px 16px;"><div class="kpi-label" style="margin-top:0;">Status</div><div style="margin-top:8px;">{% if meta.status == 'planning' %}<span class="badge badge-planning">Planning</span>{% elif meta.status == 'in_progress' %}<span class="badge badge-in_progress">In Progress</span>{% else %}<span class="badge badge-completed">Completed</span>{% endif %}</div></div>
             </div>
-            {% if meta.objectives %}<div class="info-note" style="margin-top:14px; margin-bottom:0;">{{ icon('target') }}<span><strong>Objectives:</strong> {{ meta.objectives }}</span></div>{% endif %}
+
         </div>
 <!--SETUP_Q-->
         <div class="card">
@@ -99,12 +99,8 @@
                 </div>
                 <div class="form-group">
                     <label for="num_questions">Number of Questions</label>
-                    <input type="number" id="num_questions" name="num_questions" min="1" max="15" value="{{ meta.num_questions }}" required>
+                    <input type="number" id="num_questions" name="num_questions" min="1" max="50" value="{{ meta.num_questions }}" required>
                     <div class="form-hint">Changing this regenerates the AI question set to the new count.</div>
-                </div>
-                <div class="form-group">
-                    <label for="interview_objectives">Interview Objectives</label>
-                    <textarea id="interview_objectives" name="interview_objectives" rows="3">{{ meta.objectives }}</textarea>
                 </div>
                 <div class="form-group">
                     <label for="additional_instructions">Additional Instructions</label>
