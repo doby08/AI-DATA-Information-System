@@ -276,32 +276,68 @@ def generate_interview_questions(system_type: str, user_role: str, max_questions
         List of question dictionaries with 'text' and 'category' keys
         """
     
-    # Gemini AI upgrade: generate questions with real AI when configured
-    if _gemini_enabled(gemini_cfg):
-        gem_cfg, _ = _normalize_ai_cfg(gemini_cfg)
-        ai_questions = _gemini_questions(system_type, user_role, max_questions, gem_cfg,
-                                         extra_context=extra_context)
-        if ai_questions:
-            logger.info("Gemini generated %d interview questions (system=%s, role=%s)",
-                        len(ai_questions), system_type, user_role)
-            return ai_questions
-        logger.info("Gemini question generation unavailable; using built-in templates")
+    # Gemini + Ollama work TOGETHER ("magtulungan") until the requested count
+    # is reached.  Whatever number the user enters becomes the target, and the
+    # final list ALWAYS contains exactly that many unique questions.
+    target = int(max_questions) if (max_questions and int(max_questions) > 0) else 6
+    gem_cfg, oll_cfg = _normalize_ai_cfg(gemini_cfg)
+    gemini_on = _gemini_enabled(gemini_cfg)
+    ollama_on = _ollama_enabled(gemini_cfg)
+    ai_questions = []
+    seen_keys = set()
 
-    # Ollama AI alternative: local model, no API key required
-    if _ollama_enabled(gemini_cfg):
-        _, oll_cfg = _normalize_ai_cfg(gemini_cfg)
-        ai_questions = _ollama_questions(system_type, user_role, max_questions, oll_cfg,
-                                         extra_context=extra_context)
-        if ai_questions:
-            logger.info("Ollama generated %d interview questions (system=%s, role=%s)",
-                        len(ai_questions), system_type, user_role)
-            return ai_questions
-        logger.info("Ollama question generation unavailable; using built-in templates")
-    
-    # Normalize inputs
+    def _collect(part):
+        """Merge a generated batch into ai_questions, skipping duplicates."""
+        if not part:
+            return
+        for q in part:
+            text = str(q.get("text", "")).strip()
+            key = "".join(text.lower().split())
+            if not key or key in seen_keys:
+                continue
+            seen_keys.add(key)
+            ai_questions.append({"text": text, "category": q.get("category", "context")})
+
+    # ---- Round 1: Gemini generates the full set ----
+    if gemini_on:
+        _collect(_gemini_questions(system_type, user_role, target, gem_cfg,
+                                   extra_context=extra_context))
+        logger.info("Gemini generated %d/%d interview questions (role=%s)",
+                    len(ai_questions), target, user_role)
+
+    # ---- Round 2: Ollama tops up whatever Gemini missed ----
+    if len(ai_questions) < target and ollama_on:
+        missing = target - len(ai_questions)
+        _collect(_ollama_questions(system_type, user_role, missing, oll_cfg,
+                                   extra_context=extra_context,
+                                   avoid_texts=[q["text"] for q in ai_questions]))
+        logger.info("Ollama topped up to %d/%d interview questions (role=%s)",
+                    len(ai_questions), target, user_role)
+
+    # ---- Round 3: Gemini tops up when Ollama was the primary and fell short ----
+    if len(ai_questions) < target and gemini_on:
+        missing = target - len(ai_questions)
+        _collect(_gemini_questions(system_type, user_role, missing, gem_cfg,
+                                   extra_context=extra_context,
+                                   avoid_texts=[q["text"] for q in ai_questions]))
+
+    if gemini_on or ollama_on:
+        if len(ai_questions) >= target:
+            return ai_questions[:target]
+        # Both AIs together still fell short: pad from the built-in pool so
+        # the user ALWAYS receives exactly the number they asked for.
+        missing = target - len(ai_questions)
+        pad = _fallback_question_pool(system_type, user_role, missing,
+                                      avoid_texts=[q["text"] for q in ai_questions])
+        logger.info("AI providers produced %d/%d questions; padding with %d built-in questions",
+                    len(ai_questions), target, len(pad))
+        _collect(pad)
+        return ai_questions[:target]
+
+    # Normalize inputs (no AI provider enabled -- rule-based behavior)
     system_type = system_type.lower().replace(" ", "_")
     user_role = user_role.lower().replace(" ", "_")
-    
+
     # Get questions for the system type
     if system_type in QUESTION_TEMPLATES:
         system_questions = QUESTION_TEMPLATES[system_type]
@@ -314,12 +350,12 @@ def generate_interview_questions(system_type: str, user_role: str, max_questions
             first_role = list(system_questions.keys())[0]
             questions = system_questions[first_role]
         
-        if max_questions and max_questions > 0:
-            return questions[:max_questions]
+        if target and target > 0:
+            return questions[:target]
         return questions
     else:
         # Return generic questions if system type not found
-        return get_generic_questions()
+        return get_generic_questions()[:target] if target else get_generic_questions()
 
 
 def get_generic_questions() -> list:
@@ -889,24 +925,31 @@ def _numbered_texts(responses: list) -> str:
 
 
 def _gemini_questions(system_type: str, user_role: str, max_questions: int, gemini_cfg: dict,
-                      extra_context: str = None):
+                      extra_context: str = None, avoid_texts: list = None):
     """AI-generate interview questions. Returns list of {text, category} or None."""
     try:
-        count = max_questions if (max_questions and max_questions > 0) else 6
-        # Calculate tokens needed: ~25 tokens per question + overhead for JSON structure
-        tokens_needed = max(2048, count * 30 + 500)
+        count = int(max_questions) if (max_questions and int(max_questions) > 0) else 6
+        # A JSON question entry costs ~60-90 tokens.  The old estimate
+        # (count * 30 + 500) truncated large sets, so only a few (often just
+        # one) questions survived the JSON parse.  Be generous instead.
+        tokens_needed = min(8192, max(2048, count * 90 + 1000))
         context_line = ""
         if extra_context and str(extra_context).strip():
             context_line = f"- Interview context: {str(extra_context).strip()}\n"
+        avoid_line = ""
+        if avoid_texts:
+            listed = "\n".join(f"- {t}" for t in avoid_texts[:40] if t and str(t).strip())
+            if listed:
+                avoid_line = f"\nDo NOT repeat or rephrase any of these existing questions:\n{listed}\n"
         prompt = f"""You are an expert systems analyst preparing stakeholder interview questions.
 
 Context:
 - System being studied: {str(system_type).replace('_', ' ')}
 - Stakeholder role: {str(user_role).replace('_', ' ')}
-{context_line}
-IMPORTANT: Generate exactly {count} open-ended interview questions SPECIFICALLY tailored for a "{str(user_role).replace('_', ' ')}". The questions must be relevant to their daily work, challenges, and experiences in their role.
+{context_line}{avoid_line}
+IMPORTANT: Generate EXACTLY {count} open-ended interview questions SPECIFICALLY tailored for a "{str(user_role).replace('_', ' ')}". Count your questions before answering: the JSON array MUST contain exactly {count} items — no more, no fewer. The questions must be relevant to their daily work, challenges, and experiences in their role.
 
-Topics to cover: how they use the system, challenges they face, desired improvements, workflows, pain points, goals, and suggestions. Return ONLY {count} questions. Questions must be easy to understand and answerable by a non-technical person.
+Topics to cover: how they use the system, challenges they face, desired improvements, workflows, pain points, goals, and suggestions. Every question must be unique (no duplicates). Questions must be easy to understand and answerable by a non-technical person.
 
 Each question must have a "category" chosen from exactly one of: personal_info, goals, challenges, preferences, suggestions, pain_points, workflows, desired_features, context.
 
@@ -927,8 +970,7 @@ Respond with ONLY a JSON array, no extra text, in this exact format:
             if category not in ALLOWED_QUESTION_CATEGORIES:
                 category = "context"
             questions.append({"text": text, "category": category})
-        if max_questions and max_questions > 0:
-            questions = questions[:max_questions]
+        questions = questions[:count]
         return questions or None
     except Exception as exc:
         logger.warning("Gemini question generation error: %s", exc)
@@ -1121,26 +1163,113 @@ def _clean_question_list(data, max_questions: int = None):
     return questions or None
 
 
+def _fallback_question_pool(system_type: str, user_role: str, count: int,
+                            avoid_texts: list = None) -> list:
+    """Built-in question pool used to guarantee the EXACT requested count.
+
+    Only used when both AI providers together produced fewer questions than
+    the user asked for.  It combines the role-specific template questions and
+    the generic pool, skipping anything already generated.  For very large
+    counts it adds unique role-tailored follow-ups as a last resort.
+    """
+    if count <= 0:
+        return []
+    role_display = str(user_role).replace("_", " ").strip() or "stakeholder"
+    avoid = {"".join(str(t).lower().split()) for t in (avoid_texts or []) if t}
+
+    pool = []
+    templates = QUESTION_TEMPLATES.get(str(system_type).lower().replace(" ", "_"), {})
+    role_key = str(user_role).lower().replace(" ", "_")
+    if role_key in templates:
+        pool.extend(templates[role_key])
+    else:
+        for role_questions in templates.values():
+            pool.extend(role_questions)
+    pool.extend(get_generic_questions())
+
+    out = []
+    for q in pool:
+        text = str(q.get("text", "")).strip()
+        if not text:
+            continue
+        key = "".join(text.lower().split())
+        if key in avoid:
+            continue
+        avoid.add(key)
+        out.append({"text": text, "category": q.get("category", "context")})
+        if len(out) >= count:
+            break
+    angles = [("daily workflow", "workflows"), ("biggest challenge", "challenges"),
+              ("main goal", "goals"), ("process improvement", "suggestions"),
+              ("system features", "desired_features"), ("overall experience", "preferences")]
+    idx = 1
+    while len(out) < count:
+        angle, category = angles[(idx - 1) % len(angles)]
+        out.append({"text": f"Follow-up {idx}: As a {role_display}, what else about your {angle} would you like to improve, and why?",
+                    "category": category})
+        idx += 1
+    return out
+
+
 
 def _ollama_questions(system_type: str, user_role: str, max_questions: int,
-                      oll_cfg: dict, extra_context: str = None):
-    """AI-generate interview questions via a local Ollama model. Returns list of dicts or None."""
+                      oll_cfg: dict, extra_context: str = None, avoid_texts: list = None):
+    """AI-generate interview questions via a local Ollama model.
+
+    Small local models often return fewer questions than requested (sometimes
+    just ONE) or stop early.  To make Ollama and Gemini "magtulungan" and to
+    guarantee the requested count, this keeps asking for the REMAINING number
+    in small batches (<= 15 per call) until the target is reached (max 4
+    rounds).  Returns a list of question dicts or None when Ollama is unusable.
+    """
     if ollama_ai is None:
         return None
     try:
-        tokens_needed = max(1024, (max_questions or 5) * 256)
+        want = int(max_questions) if (max_questions and int(max_questions) > 0) else 5
         context_line = ""
-        if extra_context:
+        if extra_context and str(extra_context).strip():
             context_line = f"\nInterview context: {str(extra_context).strip()}\n"
-        prompt = f"""You are preparing questions for a requirements-elicitation interview about a {system_type.replace('_', ' ')}.
-The interviewee category is: {user_role}.{context_line}
-Generate exactly {max_questions or 5} open-ended interview questions covering goals, challenges, workflows, and desired features.
+        base_avoid = [str(t).strip() for t in (avoid_texts or []) if t and str(t).strip()]
+        collected = []
+        seen_keys = {"".join(t.lower().split()) for t in base_avoid}
+        for round_no in range(4):
+            missing = want - len(collected)
+            if missing <= 0:
+                break
+            ask = min(missing, 15)  # small local models cope better in batches of <= 15
+            tokens_needed = min(8192, max(1024, ask * 300))
+            shown = (base_avoid + [q["text"] for q in collected])[:40]
+            avoid_line = ""
+            if shown:
+                listed = "\n".join(f"- {t}" for t in shown)
+                avoid_line = f"\nDo NOT repeat or rephrase any of these questions:\n{listed}\n"
+            prompt = f"""You are preparing questions for a requirements-elicitation interview about a {str(system_type).replace('_', ' ')}.
+The interviewee category is: {user_role}.{context_line}{avoid_line}
+Generate EXACTLY {ask} DIFFERENT open-ended interview questions covering goals, challenges, workflows, and desired features. Count your questions: the JSON array MUST contain exactly {ask} items, and every question must be unique.
 
 Respond with ONLY a JSON array, no extra text, in this exact format:
 [{{"text": "Question text here?", "category": "pain_points"}}]"""
-        raw = _ollama_call(prompt, oll_cfg, json_mode=True, max_output_tokens=tokens_needed)
-        data = ollama_ai.parse_json_block(raw)
-        return _clean_question_list(data, max_questions)
+            try:
+                raw = _ollama_call(prompt, oll_cfg, json_mode=True, max_output_tokens=tokens_needed)
+                data = ollama_ai.parse_json_block(raw)
+            except Exception:
+                # Some small models reject format=json (HTTP 400); retry as
+                # plain text so parsing still gets a chance.
+                raw = _ollama_call(prompt, oll_cfg, json_mode=False, max_output_tokens=tokens_needed)
+                data = ollama_ai.parse_json_block(raw)
+            batch = _clean_question_list(data, ask) or []
+            added = 0
+            for q in batch:
+                key = "".join(str(q.get("text", "")).lower().split())
+                if not key or key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                collected.append({"text": str(q.get("text", "")).strip(),
+                                  "category": q.get("category", "context")})
+                added += 1
+            if added == 0:
+                break  # the model keeps repeating itself; stop asking
+        return collected or None
     except Exception as exc:
         logger.warning("Ollama question generation error: %s", exc)
         return None

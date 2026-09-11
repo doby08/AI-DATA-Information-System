@@ -1,0 +1,9 @@
+[PASS] Gemini alone: 10/10: got 10 questions (10 unique), target 10
+[PASS] Gemini 2 + Ollama tops up to 10: got 10 questions (10 unique), target 10
+[PASS] Ollama 1 + Gemini tops up to 10: got 10 questions (10 unique), target 10
+[PASS] Both short -> padded to exact 10: got 10 questions (10 unique), target 10
+[PASS] Both short -> padded to exact 50: got 50 questions (50 unique), target 50
+[PASS] No AI: templates sliced to 4: got 4 questions (4 unique), target 4
+[PASS] Ollama alone: 8/8: got 8 questions (8 unique), target 8
+
+SUMMARY: ALL PASSED
