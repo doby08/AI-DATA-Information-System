@@ -46,8 +46,30 @@ Pwede mo i-deploy ang system online! Heto ang mga steps.
 | **`static/uploads/` avatars** | Parehong rin — temporary sa free tier. Backup mo. |
 | **Gemini API key** | Nasubmit sa Settings page pagkatapos i-deploy. Ang app tumatawag sa Google Gemini — **kinakailangan ang internet at API key** |
 | **Google Fonts CDN** | Gumagana sa online (may internet naman) |
-| **SECRET_KEY** | I-bago mo from 'your_secret_key_here' — i-set ang env var |
+| **SECRET_KEY** | Automatically generated if not set (but set your own for session persistence) |
 | **`FLASK_DEBUG=0`** | I-set sa production — para hindi lumalabas ang debugger sa iba users |
+
+## Updated Deployment Improvements
+
+The system now includes the following fixes to prevent "Internal Server Error" issues:
+
+### ✅ Automatic Database Initialization
+- Database tables auto-create on first request
+- Works on fresh Render deployments
+- Database health check at startup
+
+### ✅ Global Error Handlers  
+- Custom error pages for 400, 401, 403, 404, 405, 500, 502, 503
+- Detailed errors logged to Render dashboard
+- Database rollback on errors
+
+### ✅ Secure Session Configuration
+- Auto-generated SECRET_KEY if not set
+- Secure cookie settings (HTTPOnly, SameSite)
+
+### ✅ Improved Logging
+- Logs to stdout for Render dashboard visibility
+- File logging only in development
 
 ## Local pa rin gumagana
 

@@ -23,12 +23,19 @@ import tempfile
 from functools import wraps
 import hashlib
 import time
+import secrets
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # Change this to a secure secret key
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # "Remember me" duration
 
-DATABASE = "data.db"
+# SECRET_KEY: Use environment variable if set, otherwise generate a secure random key
+# This prevents session errors on deployment when SECRET_KEY env var might be missing
+app.secret_key = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # "Remember me" duration
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get("FLASK_ENV") == "production"
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+DATABASE = os.environ.get("DATABASE_PATH", "data.db")
 
 # Unified stakeholder categories used for account registration, login
 # authentication ("Login as"), interview participant roles, and session grouping.
@@ -96,6 +103,180 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# ============ GLOBAL ERROR HANDLERS ============
+# These prevent raw Internal Server Errors and show user-friendly messages instead
+
+@app.errorhandler(400)
+def bad_request_error(error):
+    """Handle 400 Bad Request errors gracefully."""
+    logger.warning(f"Bad request: {error}")
+    return render_template("error.html", 
+                           error_code=400, 
+                           error_message="Invalid request. Please check your input and try again."), 400
+
+@app.errorhandler(401)
+def unauthorized_error(error):
+    """Handle 401 Unauthorized errors."""
+    return render_template("error.html", 
+                           error_code=401, 
+                           error_message="Please log in to access this page."), 401
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    """Handle 403 Forbidden errors."""
+    return render_template("error.html", 
+                           error_code=403, 
+                           error_message="You don't have permission to access this resource."), 403
+
+@app.errorhandler(404)
+def not_found_error(error):
+    """Handle 404 Not Found errors."""
+    return render_template("error.html", 
+                           error_code=404, 
+                           error_message="The page you're looking for doesn't exist."), 404
+
+@app.errorhandler(405)
+def method_not_allowed_error(error):
+    """Handle 405 Method Not Allowed errors."""
+    return render_template("error.html", 
+                           error_code=405, 
+                           error_message="This action is not allowed."), 405
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Handle 500 Internal Server Error - log the error and show user-friendly message."""
+    logger.error(f"Internal Server Error: {error}", exc_info=True)
+    # Try to rollback any failed database transaction
+    try:
+        db = sqlite3.connect(DATABASE)
+        db.rollback()
+        db.close()
+    except Exception:
+        pass
+    
+    # Check if database exists and is accessible
+    db_ok = False
+    try:
+        db = sqlite3.connect(DATABASE)
+        db.execute("SELECT 1")
+        db.close()
+        db_ok = True
+    except Exception as e:
+        logger.error(f"Database check failed: {e}")
+        db_ok = False
+    
+    return render_template("error.html",
+                           error_code=500,
+                           error_message="Something went wrong on our end. Please try again later.",
+                           db_issue=not db_ok,
+                           show_details=os.environ.get("FLASK_DEBUG") == "1"), 500
+
+@app.errorhandler(502)
+def bad_gateway_error(error):
+    """Handle 502 Bad Gateway errors (common with AI service failures)."""
+    logger.error(f"Bad Gateway Error: {error}")
+    return render_template("error.html",
+                           error_code=502,
+                           error_message="Service temporarily unavailable. Please try again later."), 502
+
+@app.errorhandler(503)
+def service_unavailable_error(error):
+    """Handle 503 Service Unavailable errors."""
+    logger.error(f"Service Unavailable: {error}")
+    return render_template("error.html",
+                           error_code=503,
+                           error_message="Service temporarily unavailable. Please try again later."), 503
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(error):
+    """Catch-all handler for any unhandled exceptions - prevents raw error pages."""
+    logger.error(f"Unexpected error: {error}", exc_info=True)
+    return render_template("error.html",
+                           error_code=500,
+                           error_message="An unexpected error occurred. Please try again later."), 500
+
+# ============ LOGGING CONFIGURATION (Updated) ============
+# In production (Render), use stdout so logs appear in Render dashboard
+# In development, also write to app.log file
+def setup_logging():
+    """Configure logging for both development and production environments."""
+    log_level = logging.DEBUG if os.environ.get("FLASK_DEBUG") == "1" else logging.INFO
+    
+    # Always log to stdout (visible in Render dashboard)
+    stdout_handler = logging.StreamHandler()
+    stdout_handler.setLevel(log_level)
+    stdout_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    ))
+    
+    handlers = [stdout_handler]
+    
+    # In development, also write to file
+    if os.environ.get("FLASK_DEBUG") == "1":
+        try:
+            file_handler = logging.FileHandler('app.log')
+            file_handler.setLevel(log_level)
+            file_handler.setFormatter(logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            ))
+            handlers.append(file_handler)
+        except Exception as e:
+            logger.warning(f"Could not create file handler: {e}")
+    
+    logging.basicConfig(
+        level=log_level,
+        handlers=handlers
+    )
+
+# Re-setup logging with proper configuration
+logging.getLogger().handlers.clear()
+setup_logging()
+logger = logging.getLogger(__name__)
+
+# ============ APPLICATION STARTUP ============
+# Initialize database on first request (ensures DB exists even on fresh Render deploy)
+# This runs before the first request is processed
+@app.before_request
+def before_first_request():
+    """Initialize database and check critical setup on first request."""
+    # Only run once - check if database is ready
+    if not hasattr(app, '_db_initialized'):
+        app._db_initialized = False
+    
+    if not app._db_initialized:
+        try:
+            init_db()
+            app._db_initialized = True
+            logger.info("Database initialized successfully on first request")
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            # Don't raise - let other handlers deal with it
+
+# Alternative: Run initialization at module import time (for gunicorn workers)
+# This ensures DB is ready before any request comes in
+def ensure_database_ready():
+    """Ensure database tables exist. Safe to call multiple times."""
+    try:
+        conn = sqlite3.connect(DATABASE)
+        cursor = conn.cursor()
+        
+        # Check if critical tables exist
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        if not cursor.fetchone():
+            conn.close()
+            init_db()
+            logger.info("Database tables created on startup")
+        else:
+            logger.info("Database tables already exist")
+        
+        conn.close()
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+
+# Initialize database immediately when module is loaded
+# This helps with gunicorn workers that import the module
+ensure_database_ready()
 
 
 @app.after_request
@@ -2633,4 +2814,7 @@ def export_backup():
 
 if __name__ == "__main__":
     init_db()
-    app.run(debug=True)
+    # Use PORT from environment (Render sets this), default to 5000 for local dev
+    port = int(os.environ.get("PORT", 5000))
+    debug = os.environ.get("FLASK_DEBUG") != "0"
+    app.run(host="0.0.0.0", port=port, debug=debug)

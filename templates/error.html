@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error {{ error_code }} — A.I.S.I.A.P.</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%23855CF8'/%3E%3Crect width='24' height='4' fill='%23FFB800'/%3E%3Ccircle cx='9' cy='15' r='5' fill='white'/%3E%3Ccircle cx='15' cy='10' r='3.5' fill='white'/%3E%3Cpath d='M4 22h16' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        .error-container {
+            background: white;
+            border-radius: 24px;
+            padding: 48px 40px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .error-icon {
+            width: 80px;
+            height: 80px;
+            background: #fee2e2;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+        }
+        .error-icon svg { width: 40px; height: 40px; }
+        .error-code {
+            font-size: 72px;
+            font-weight: 700;
+            color: #855CF8;
+            line-height: 1;
+            margin-bottom: 16px;
+        }
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 12px;
+        }
+        p {
+            color: #6b7280;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        .error-details {
+            background: #f9fafb;
+            border-radius: 12px;
+            padding: 16px;
+            margin: 24px 0;
+            font-size: 13px;
+            color: #6b7280;
+            text-align: left;
+            font-family: monospace;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: #855CF8;
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn:hover { background: #7450E0; }
+        .btn-primary { background: #855CF8; }
+        .btn-primary:hover { background: #7450E0; }
+        .footer-text {
+            margin-top: 24px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+    </style>
+    <script>
+        // Rainbow background animation
+        document.documentElement.style.setProperty('--bg-gradient', 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)');
+    </script>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="#EF4444">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+        </div>
+        
+        <div class="error-code">{{ error_code }}</div>
+        <h1>{{ error_message }}</h1>
+        
+        {% if db_issue %}
+        <div class="error-details">
+            <strong>⚠️ Database Notice:</strong><br>
+            Our database appears to be temporarily unavailable or needs to be initialized. 
+            This can happen after a server restart on free hosting platforms. 
+            Please try again in a moment, or contact support if the issue persists.
+        </div>
+        {% endif %}
+        
+        {% if show_details %}
+        <div class="error-details">
+            <strong>Debug Information:</strong><br>
+            {{ error_message }}<br><br>
+            <em>(Request ID: {{ error_code }}-{{ now() }})</em>
+        </div>
+        {% endif %}
+        
+        <p>Our team has been notified and is working on fixing this issue.</p>
+        
+        <a href="/" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            Back to Home
+        </a>
+        
+        <p class="footer-text">A.I.S.I.A.P. — AI-Assisted Stakeholders Interview & Analysis Portal</p>
+    </div>
+</body>
+</html>
