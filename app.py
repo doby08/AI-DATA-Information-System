@@ -275,8 +275,9 @@ def ensure_database_ready():
         logger.error(f"Database health check failed: {e}")
 
 # Initialize database immediately when module is loaded
-# This helps with gunicorn workers that import the module
-ensure_database_ready()
+# This helps with gunicorn workers that import the module.
+# NOTE: The actual call happens right after init_db() is defined below,
+# because this function calls init_db() which must exist first.
 
 
 @app.after_request
@@ -525,6 +526,29 @@ def init_db():
         logger.info("Migration applied: added additional_instructions column to interview_sessions")
     except sqlite3.OperationalError:
         pass  # Column already exists
+
+    # Default admin bootstrap: on a fresh database (e.g. first deploy on
+    # Render, where data.db is not committed to git and gets wiped on
+    # restarts), automatically create the Owner/Admin account so the owner
+    # is never locked out of the system. Override via ADMIN_USERNAME /
+    # ADMIN_PASSWORD environment variables if needed.
+    try:
+        cursor.execute("SELECT COUNT(*) FROM users")
+        if cursor.fetchone()[0] == 0:
+            default_admin = os.environ.get("ADMIN_USERNAME", "Dan")
+            default_password = os.environ.get("ADMIN_PASSWORD", "102398")
+            year = datetime.now().strftime("%Y")
+            cursor.execute(
+                """
+                INSERT INTO users (username, password, email, role, account_code)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (default_admin, hash_password(default_password), "", "Owner/Admin",
+                 f"ACC-{year}-0001")
+            )
+            logger.info(f"Seeded default Owner/Admin account '{default_admin}' (fresh database)")
+    except sqlite3.Error as e:
+        logger.warning(f"Default admin seeding skipped: {e}")
 
     conn.commit()
     conn.close()
@@ -2810,6 +2834,12 @@ def export_backup():
         logger.error(f"Backup export failed for user '{user}': {e}")
         flash("Backup failed. Please try again.", "error")
         return redirect(url_for('settings_page'))
+
+
+# Initialize database immediately when the module is loaded (gunicorn-safe:
+# this runs AFTER all function definitions below, so init_db and hash_password
+# always exist when it executes)
+ensure_database_ready()
 
 
 if __name__ == "__main__":
